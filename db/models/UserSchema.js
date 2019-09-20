@@ -1,45 +1,24 @@
-let mongoose = require("mongoose");
-let uniqueValidator = require("mongoose-unique-validator");
-let passportLocalMongoose = require("passport-local-mongoose");
+const mongoose = require("mongoose");
+const uniqueValidator = require("mongoose-unique-validator");
+const passportLocalMongoose = require("passport-local-mongoose");
 
-var UserSchema = mongoose.Schema({
+const UserSchema = mongoose.Schema({
   email: {
     type: String,
     index: true,
     unique: true,
     required: true
   },
-  username: {
-    type: String,
-    index: true,
-    unique: true,
-    required: true
+  alerts: {
+    type: Object
   },
-  active: {
-    type: Boolean
-  }, // the user activate his account
-  login: {
-    type: Boolean
-  }, // the user is login or not
-  dateOfRegistration: {
-    type: Date
-  },
-  isTester: {
-    type: Boolean,
-    default: false
-  } // is tester account
-});
-
-UserSchema.plugin(uniqueValidator);
-UserSchema.plugin(passportLocalMongoose, {
-  findByUsername: function(model, queryParameters) {
-    // Add additional query parameter - AND condition - active: true
-    queryParameters.active = true;
-    return model.findOne(queryParameters);
+  searches: {
+    type: Object,
+    default:{}
   }
-});
+}, { minimize: false });
 
-let User = mongoose.model("users", UserSchema);
-module.exports = {
-  User
-};
+
+
+const User = mongoose.model("yad2_alerts_user", UserSchema);
+module.exports = { User };
