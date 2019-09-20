@@ -2,9 +2,10 @@ const { User } = require('../db/models/UserSchema')
 const urlParser = require('query-string')
 const Nightmare = require('nightmare')
 const { exec } = require('child_process')
-const jwt = require('jsonwebtoken');
-const stringHash = require('string-hash');
+const jwt = require('jsonwebtoken')
+const stringHash = require('string-hash')
 const _ = require('lodash')
+const { createUrl } = require('../utils/utils')
 
 function getAllUsers(req, res, next) {
   return new Promise((resolve, reject) => {
@@ -34,10 +35,8 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
     throw new Error('No such neighborhood')
   }
  
-  neighborhood = neighborhood ? `neighborhood=` + neighborhood : ''
-  const url = `https://www.yad2.co.il/realestate/rent?city=5000&` + neighborhood + `&rooms=${fromRooms}-${toRooms}&price=${fromPrice}-${toPrice}`
+  const url = createUrl(neighborhood, fromRooms, toRooms, fromPrice, toPrice)
   console.log('link in crawler', url)
-  //const token = jwt.sign({ url }, 'shhhhh');
   const token = stringHash(url)
   return { url, token }
 }
@@ -105,29 +104,29 @@ function addLinks(token, links, state, email) {
 */
 async function expendFeed(instance, config, email) {
   
-  const { url, token } = urlBuilder(config)
+  try {
+    const { url, token } = urlBuilder(config)
 
-  await addNewSearch(token, email)
-
-  console.log(url)
-  const list = await instance
-  // .on('console', (log, msg) => {
-  //   console.log(msg)
-  // })
-  .goto(url)
-  .wait('.feed_list')
-  .evaluate(async () => {
-
-    const clickableItemQuery = '.feeditem .feed_item div'
-    const children = document.querySelector('.feed_list').children
-    const textNodes = []
-    
-    for(let i = 0; i < children.length; i++) {
-      const el = children[i].querySelector(clickableItemQuery)
-      if (el) await el.click()
-    }
-  })
-  return token
+    await addNewSearch(token, email)
+    //console.log(url)
+    const list = await instance
+    .goto(url)
+    .wait('.feed_list')
+    .evaluate(async () => {
+  
+      const clickableItemQuery = '.feeditem .feed_item div'
+      const children = document.querySelector('.feed_list').children
+      const textNodes = []
+      
+      for(let i = 0; i < children.length; i++) {
+        const el = children[i].querySelector(clickableItemQuery)
+        if (el) await el.click()
+      }
+    })
+    return token
+  } catch(e) {
+    return null
+  }
 }
 
 
@@ -217,7 +216,7 @@ async function main(req, res, next) {
       const url = urlParser.parse(user.alerts[id])
       console.log('url is', url)
 
-      const nightmare = Nightmare({ show: true })
+      const nightmare = Nightmare({ show: true, waitTimeout: 3000 })
       // go to yad2
 
       const config = {
@@ -230,24 +229,27 @@ async function main(req, res, next) {
 
       console.log('config\n', config)
 
+      try {
+        const token = await expendFeed(nightmare, config, email);
 
-      const token = await expendFeed(nightmare, config, email);
-
-      // get links from yad2
-      const newLinks = await getLinks(nightmare)
-
-      // write links to file
-      addLinks(token, newLinks, 'new', email)
-
-      //const newLinks = await readLinks(token, 'new')
-      const oldLinks = await readLinks(token, 'old', email)
-
-      // replace old links with the new one's
-      addLinks(token, newLinks, 'old', email)
-
-      // get new files
-      const foundLinks = compare(oldLinks, newLinks)
-      results[token] = foundLinks
+        // get links from yad2
+        const newLinks = await getLinks(nightmare)
+  
+        // write links to file
+        addLinks(token, newLinks, 'new', email)
+  
+        //const newLinks = await readLinks(token, 'new')
+        const oldLinks = await readLinks(token, 'old', email)
+  
+        // replace old links with the new one's
+        addLinks(token, newLinks, 'old', email)
+  
+        // get new files
+        const foundLinks = compare(oldLinks, newLinks)
+        results[token] = foundLinks
+      } catch(e) {
+        console.log('no results here')
+      }
     }
   }
   return res.status(200).json({ new:results })

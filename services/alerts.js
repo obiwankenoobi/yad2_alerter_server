@@ -1,6 +1,7 @@
-const jwt = require("jsonwebtoken");
-const { User } = require("../db/models/UserSchema");
-const stringHash = require("string-hash");
+const jwt = require("jsonwebtoken")
+const { User } = require("../db/models/UserSchema")
+const stringHash = require("string-hash")
+const { createUrl } = require('../utils/utils')
 
 async function createAlert(req, res, next) {
   const { body: { email, alerts } } = req
@@ -12,10 +13,9 @@ async function createAlert(req, res, next) {
       }
       const links = {}
       for(let alert of alerts) {
-        const url = 
-          `https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=${alert.neighborhood.value}&rooms=${alert.fromRoom.value}-${alert.toRoom.value}&price=${alert.fromPrice.value}-${alert.toPrice.value}`
-          console.log('link in alerts', url)
-          const id = stringHash(url)
+        const url = createUrl(alert.neighborhood.value, alert.fromRoom.value, alert.toRoom.value, alert.fromPrice.value, alert.toPrice.value)
+        console.log('link in alerts', url)
+        const id = stringHash(url)
         links[id] = url
       }
   
