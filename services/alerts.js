@@ -6,7 +6,7 @@ const { createUrl } = require('../utils/utils')
 async function createAlert(req, res, next) {
   const { body: { email, alerts } } = req
   return new Promise((resolve, reject) => {
-    User.findOne({email:req.body.email}, (error, user) => {
+    User.findOne({ email }, (error, user) => {
       if (error) {
         console.log(error)
         return res.status(500).json({error})

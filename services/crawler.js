@@ -1,4 +1,5 @@
 const { User } = require('../db/models/UserSchema')
+const { Search } = require('../db/models/SearchesSchema')
 const urlParser = require('query-string')
 const Nightmare = require('nightmare')
 const { exec } = require('child_process')
@@ -46,58 +47,65 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
 
 //add alert:https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1483&rooms=2-2.5&price=500-1000
 
-function addNewSearch(token, email) {
+function addNewSearch(url, hash) {
   return new Promise((resolve, reject) => {
-    User.findOne({ email }, (error, user) => {
+    Search.findOne({ hash }, (error, searchObj) => {
       if (error) {
         return reject({error})
       }
-      if (!user) {
-        return reject('no user')
+
+
+      if (!searchObj) {
+        const newSearch = new Search({
+          hash, 
+          url,
+          searches:{
+            old:[],
+            new:[]
+          }
+        })
+        newSearch.save((error, doc) => {
+          if (error) {
+            console.log(error)
+            reject(error)
+          }
+          resolve('searches saved')
+        })
+      } else {
+        searchObj.save((error, doc) => {
+          if (error) {
+            console.log(error)
+            reject(error)
+          }
+          resolve('searches saved')
+        })
       }
-  
-      const searches = _.cloneDeep(user.searches)
-      if (!searches[token]) {
-        searches[token] = {}
-        searches[token].old = []
-        searches[token].new = []
-      }
-      user.searches = searches
-      user.save((error, doc) => {
-        if (error) {
-          console.log(error)
-          reject(error)
-        }
-        resolve('searches saved')
-      })
     })
   })
 }
 
-function addLinks(token, links, state, email) {
+function addLinks(hash, links, state) {
  
   return new Promise((resolve, reject) => {
     if (!links.length) return resolve()
-    User.findOne({ email }, (error, user) => {
+    Search.findOne({ hash }, (error, searchObj) => {
       if (error) {
+        console.log(error)
         return reject({error})
       }
-      if (!user) {
+      if (!searchObj) {
         return reject('no user')
       }
 
-
-  
-      const searches = _.cloneDeep(user.searches)
 
       // prevent from updating the links when there was some 
       // problem with the headless browser and it couldn't
       // get all links from the page
-      if (state === 'old' && searches[token]['old'] && searches[token]['old'].length > links.length) return
+      if (state === 'old' && searchObj.searches['old'] && searchObj.searches['old'].length > links.length) return
 
-      searches[token][state] = links
-      user.searches = searches
-      user.save((error, doc) => {
+      searchObj.searches[state] = links
+      searchObj.markModified('searches');
+      searchObj.save((error, doc) => {
         if (error) {
           console.log(error)
           reject(error)
@@ -109,12 +117,12 @@ function addLinks(token, links, state, email) {
 }
 
 
-async function expendFeed(instance, config, email) {
+async function expendFeed(instance, config) {
   
   try {
     const { url, token } = urlBuilder(config)
 
-    await addNewSearch(token, email)
+    await addNewSearch(url, token)
     
     const list = await instance
     .goto(url)
@@ -170,18 +178,16 @@ function writeLinks(links, fileName) {
   })
 }
 
-function readLinks(token, state, email) {
+function readLinks(hash, state) {
   return new Promise((resolve, reject) => {
-    User.findOne({ email }, (error, user) => {
+    Search.findOne({ hash }, (error, searchObj) => {
       if (error) {
         return reject({error})
       }
-      if (!user) {
+      if (!searchObj) {
         return reject('no user')
       }
-  
-      const searches = _.cloneDeep(user.searches)
-      resolve(user.searches[token][state])
+      resolve(searchObj.searches[state])
     })
   })
 }
@@ -217,46 +223,56 @@ async function main(req, res, next) {
   if (!users.length) return
 
   const results = {}
-
+  const hashes = {}
   for(let user of users) {
     const email = user.email
     for(let id in user.alerts) {
-      const url = urlParser.parse(user.alerts[id])
-      const nightmare = Nightmare({ show: true, waitTimeout: 5000 })
-      // go to yad2
-
-      const config = {
-        neighborhood:url.neighborhood,
-        fromPrice:url.price.split('-')[0],
-        toPrice:url.price.split('-')[1],
-        fromRooms:url.rooms.split('-')[0],
-        toRooms:url.rooms.split('-')[1],
-      }
-
-      try {
-        const token = await expendFeed(nightmare, config, email);
-
-        // get links from yad2
-        const newLinks = await getLinks(nightmare)
-  
-        // write links to file
-        await addLinks(token, newLinks, 'new', email)
-  
-        //const newLinks = await readLinks(token, 'new')
-        const oldLinks = await readLinks(token, 'old', email)
-  
-        // replace old links with the new one's
-        await addLinks(token, newLinks, 'old', email)
-  
-        // get new files
-        const foundLinks = getNewLinks(oldLinks, newLinks)
-        results[token] = foundLinks
-      } catch(e) {
-        console.log('no results here')
+      if (!hashes[id]) {
+        hashes[id] = {
+          url:user.alerts[id],
+          emails:[user.email]
+        }
+      } else {
+        hashes[id].emails.push(user.email)
       }
     }
-    console.log({ results, email })
   }
+
+  for(let hash in hashes) { 
+    const url = urlParser.parse(hashes[hash].url)
+    const nightmare = Nightmare({ show: true, waitTimeout: 5000 })
+    const config = {
+      neighborhood:url.neighborhood,
+      fromPrice:url.price.split('-')[0],
+      toPrice:url.price.split('-')[1],
+      fromRooms:url.rooms.split('-')[0],
+      toRooms:url.rooms.split('-')[1],
+    }
+
+    try {
+      const token = await expendFeed(nightmare, config);
+
+      // get links from yad2
+      const newLinks = await getLinks(nightmare)
+
+      // write links to file
+      await addLinks(token, newLinks, 'new')
+
+      //const newLinks = await readLinks(token, 'new')
+      const oldLinks = await readLinks(token, 'old')
+
+      // replace old links with the new one's
+      await addLinks(token, newLinks, 'old')
+
+      // get new files
+      const foundLinks = getNewLinks(oldLinks, newLinks)
+      results[token] = {foundLinks, emails:hash.emails}
+    } catch(e) {
+      console.log({error:e})
+    }
+  }
+  console.log(JSON.stringify(results, null, 2))
+  //console.log(JSON.stringify(hashes, null, 2))
 }
 
 
