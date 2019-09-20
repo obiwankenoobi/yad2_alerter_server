@@ -126,16 +126,29 @@ async function expendFeed(instance, config) {
     
     const list = await instance
     .goto(url)
+    .on('console', (log, msg) => {
+      console.log(msg)
+    })
     .wait('.feed_list')
     .evaluate(async () => {
   
       const clickableItemQuery = '.feeditem .feed_item div'
+      const adFinderQuery = '.feeditem .platinum'
+      const agencyFinderQuery = '.feeditem .agency'
       const children = document.querySelector('.feed_list').children
       const textNodes = []
       
       for(let i = 0; i < children.length; i++) {
-        const el = children[i].querySelector(clickableItemQuery)
-        if (el) await el.click()
+        // ignoring sponsored links
+        if (children[i].querySelector(adFinderQuery)) {
+          console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+          console.log('@@@@@@@@@@@@@ ad alert @@@@@@@@@@@@@')
+          console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+          continue;
+        } else {
+          const el = children[i].querySelector(clickableItemQuery)
+          if (el) await el.click()
+        }
       }
     })
     return token
