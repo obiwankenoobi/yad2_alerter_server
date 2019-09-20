@@ -75,7 +75,9 @@ function addNewSearch(token, email) {
 }
 
 function addLinks(token, links, state, email) {
+ 
   return new Promise((resolve, reject) => {
+    if (!links.length) return resolve()
     User.findOne({ email }, (error, user) => {
       if (error) {
         return reject({error})
@@ -83,9 +85,16 @@ function addLinks(token, links, state, email) {
       if (!user) {
         return reject('no user')
       }
+
+
   
       const searches = _.cloneDeep(user.searches)
-      // const cleanLinks = links.map(link => link.split('s/c/')[1])
+
+      // prevent from updating the links when there was some 
+      // problem with the headless browser and it couldn't
+      // get all links from the page
+      if (state === 'old' && searches[token]['old'] && searches[token]['old'].length > links.length) return
+
       searches[token][state] = links
       user.searches = searches
       user.save((error, doc) => {
@@ -178,7 +187,7 @@ function readLinks(token, state, email) {
 }
 
 function getNewLinks(prevLinks, currentLinks) {
-  
+  console.log({ prevLinks, currentLinks })
   const newLinks = {}
 
   currentLinks.forEach(link => {
@@ -213,7 +222,7 @@ async function main(req, res, next) {
     const email = user.email
     for(let id in user.alerts) {
       const url = urlParser.parse(user.alerts[id])
-      const nightmare = Nightmare({ show: false, waitTimeout: 5000 })
+      const nightmare = Nightmare({ show: true, waitTimeout: 5000 })
       // go to yad2
 
       const config = {
@@ -231,24 +240,23 @@ async function main(req, res, next) {
         const newLinks = await getLinks(nightmare)
   
         // write links to file
-        addLinks(token, newLinks, 'new', email)
+        await addLinks(token, newLinks, 'new', email)
   
         //const newLinks = await readLinks(token, 'new')
         const oldLinks = await readLinks(token, 'old', email)
   
         // replace old links with the new one's
-        addLinks(token, newLinks, 'old', email)
+        await addLinks(token, newLinks, 'old', email)
   
         // get new files
-        const foundLinks = compare(oldLinks, newLinks)
+        const foundLinks = getNewLinks(oldLinks, newLinks)
         results[token] = foundLinks
       } catch(e) {
         console.log('no results here')
       }
     }
+    console.log({ results, email })
   }
-  //return res.status(200).json({ new:results })
-  return console.log({ new:results })
 }
 
 
