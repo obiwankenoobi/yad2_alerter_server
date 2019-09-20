@@ -7,14 +7,13 @@ const stringHash = require('string-hash')
 const _ = require('lodash')
 const { createUrl } = require('../utils/utils')
 
-function getAllUsers(req, res, next) {
+function getAllUsers() {
   return new Promise((resolve, reject) => {
     User.find((error, users) => {
       if (error) return reject(error)
       resolve(users)
     })
   })
-
 }
 
 function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 0, toRooms = 99999}) {
@@ -30,18 +29,21 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
     heart_tel_aviv:'1520'
   }
 
-  console.log('neighborhood: ', neighborhood)
   if (neighborhood && !Object.values(neighborhoods).includes(neighborhood)) {
     throw new Error('No such neighborhood')
   }
  
-  const url = createUrl(neighborhood, fromRooms, toRooms, fromPrice, toPrice)
-  console.log('link in crawler', url)
+  const url = createUrl(neighborhood, fromPrice, toPrice, fromRooms, toRooms)
+  console.log('url: ', url)
   const token = stringHash(url)
   return { url, token }
 }
 
-//crawler:  https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1483&rooms=2-2.5&price=500-1000
+
+
+//crawler:  https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=205&rooms=1-2.5&price=500-1000
+//crawler:  https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=205&rooms=1-2.5&price=500-1000
+
 //add alert:https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1483&rooms=2-2.5&price=500-1000
 
 function addNewSearch(token, email) {
@@ -98,17 +100,13 @@ function addLinks(token, links, state, email) {
 }
 
 
-
-/*
-* TODO: fix bug where the crawler hang when there is no results
-*/
 async function expendFeed(instance, config, email) {
   
   try {
     const { url, token } = urlBuilder(config)
 
     await addNewSearch(token, email)
-    //console.log(url)
+    
     const list = await instance
     .goto(url)
     .wait('.feed_list')
@@ -204,19 +202,18 @@ function compare(prevLinks, currentLinks) {
 
 async function main(req, res, next) {
   console.log('start')
-  const { body: { email } } = req
   
-  const users = await getAllUsers(req, res, next)
+  const users = await getAllUsers()
+
+  if (!users.length) return
 
   const results = {}
 
   for(let user of users) {
-    console.log('user.alerts', user.alerts)
+    const email = user.email
     for(let id in user.alerts) {
       const url = urlParser.parse(user.alerts[id])
-      console.log('url is', url)
-
-      const nightmare = Nightmare({ show: true, waitTimeout: 3000 })
+      const nightmare = Nightmare({ show: false, waitTimeout: 5000 })
       // go to yad2
 
       const config = {
@@ -226,8 +223,6 @@ async function main(req, res, next) {
         fromRooms:url.rooms.split('-')[0],
         toRooms:url.rooms.split('-')[1],
       }
-
-      console.log('config\n', config)
 
       try {
         const token = await expendFeed(nightmare, config, email);
@@ -252,7 +247,8 @@ async function main(req, res, next) {
       }
     }
   }
-  return res.status(200).json({ new:results })
+  //return res.status(200).json({ new:results })
+  return console.log({ new:results })
 }
 
 

@@ -13,8 +13,7 @@ async function createAlert(req, res, next) {
       }
       const links = {}
       for(let alert of alerts) {
-        const url = createUrl(alert.neighborhood.value, alert.fromRoom.value, alert.toRoom.value, alert.fromPrice.value, alert.toPrice.value)
-        console.log('link in alerts', url)
+        const url = createUrl(alert.neighborhood.value, alert.fromPrice.value, alert.toPrice.value, alert.fromRooms.value, alert.toRooms.value)
         const id = stringHash(url)
         links[id] = url
       }
@@ -45,10 +44,9 @@ function addAlert(req, res, next) {
     // each object as prop of { nextAlerts } with its 'id' 
     // as key
     for(let alert of alerts) {
-      const link = 
-        `https://www.yad2.co.il/realestate/rent?city=5000&${alert.neighborhood.value}&rooms=${alert.fromRoom.value}-${alert.toRoom.value}&price=${alert.fromPrice.value}-${alert.toPrice.value}`
-      const id = stringHash(link)
-      nextAlerts[id] = link
+      const url = createUrl(alert.neighborhood.value, alert.fromPrice.value, alert.toPrice.value, alert.fromRooms.value, alert.toRooms.value)
+      const id = stringHash(url)
+      nextAlerts[id] = url
     }
 
     // rotating through the alerts object returned
