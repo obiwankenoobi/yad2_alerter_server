@@ -8,6 +8,9 @@ const stringHash = require('string-hash')
 const _ = require('lodash')
 const { createUrl } = require('../utils/utils')
 
+/**
+ * return all users from database
+ */
 function getAllUsers() {
   return new Promise((resolve, reject) => {
     User.find((error, users) => {
@@ -17,8 +20,30 @@ function getAllUsers() {
   })
 }
 
-function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 0, toRooms = 99999}) {
 
+/**
+ * @typedef {Object} UrlObject
+ * @property {String} url the url that was created
+ * @property {String} token the hash of the url
+ */
+
+/**
+ * @typedef {Object} SearchConfig
+ * @property {String} neighborhood string with the id of neighborhood
+ * @property {Number} fromPrice starting price
+ * @property {Number} toPrice limit price
+ * @property {Number} fromRooms starting rooms 
+ * @property {Number} toRooms limit rooms 
+ * @property {Boolean} ignoreAgencies ignore agencies listing
+ */
+
+
+/**
+ * 
+ * @param {SearchConfig} config object with search config
+ * @returns {UrlObject} { url}
+ */
+function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 0, toRooms = 99999}) {
   const neighborhoods = {
     florentine:'205',
     north_old_north:'1483',
@@ -41,19 +66,18 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
 }
 
 
-
-//crawler:  https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=205&rooms=1-2.5&price=500-1000
-//crawler:  https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=205&rooms=1-2.5&price=500-1000
-
-//add alert:https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1483&rooms=2-2.5&price=500-1000
-
+/**
+ * function to add new search term to db
+ * @param {String} url the url to crawl
+ * @param {String} hash the hash of url to crawl
+ * @returns {Promise}
+ */
 function addNewSearch(url, hash) {
   return new Promise((resolve, reject) => {
     Search.findOne({ hash }, (error, searchObj) => {
       if (error) {
         return reject({error})
       }
-
 
       if (!searchObj) {
         const newSearch = new Search({
@@ -84,6 +108,12 @@ function addNewSearch(url, hash) {
   })
 }
 
+/**
+ * function to add links to db
+ * @param {String} hash hash of the url to crawl
+ * @param {Array} links array of links to add
+ * @param {String} state can be 'old' | 'new' based on the place it called
+ */
 function addLinks(hash, links, state) {
   
   return new Promise((resolve, reject) => {
@@ -118,6 +148,14 @@ function addLinks(hash, links, state) {
 }
 
 
+
+
+
+/**
+ * function to open yad2 and expend the listing
+ * @param {Nightmare} instance instance of nightmare
+ * @param {SearchConfig} config search config
+ */
 async function expendFeed(instance, config) {
   
   try {
@@ -171,6 +209,10 @@ async function expendFeed(instance, config) {
 }
 
 
+/**
+ * function to get links of listing from yad2
+ * @param {Nightmare} instance instance of nightmare
+ */
 async function getLinks(instance) {
   
   const isOpened = '.feeditem .accordion_opened'
@@ -197,6 +239,11 @@ async function getLinks(instance) {
   return links
 }
 
+/**
+ * function to write links into file
+ * @param {Array} links array of links to write
+ * @param {String} fileName name of file to write links to
+ */
 function writeLinks(links, fileName) {
   exec(`> ${fileName}`)
   links.forEach(link => {
@@ -204,6 +251,11 @@ function writeLinks(links, fileName) {
   })
 }
 
+/**
+ * function to read links from search term in db
+ * @param {String} hash hash of the search to read from
+ * @param {String} state can be 'old' | 'new' based on where it's called
+ */
 function readLinks(hash, state) {
   return new Promise((resolve, reject) => {
     Search.findOne({ hash }, (error, searchObj) => {
@@ -218,6 +270,12 @@ function readLinks(hash, state) {
   })
 }
 
+/**
+ * function to compare between two list and return the difference as the new links
+ * @param {Array} prevLinks links that already exist in db
+ * @param {Array} currentLinks links that just crawled
+ * @returns {Array} array of new listings
+ */
 function getNewLinks(prevLinks, currentLinks) {
   console.log({ prevLinks, currentLinks })
   const newLinks = {}
@@ -241,6 +299,12 @@ function compare(prevLinks, currentLinks) {
   return getNewLinks(prevLinks, currentLinks)
 }
 
+
+/**
+ * function to get search hashes from signed users
+ * @param {Redis} redis redis instance
+ * @param {Object} users object of users 
+ */
 async function getHashes(redis, users) {
   let hashes = await redis.getAsync('hashes')
   if (!hashes) {
@@ -251,10 +315,10 @@ async function getHashes(redis, users) {
         if (!hashesTmp[id]) {
           hashesTmp[id] = {
             url:user.alerts[id],
-            emails:[user.email]
+            emails:{[user.email]:true}
           }
         } else {
-          hashesTmp[id].emails.push(user.email)
+          hashesTmp[id].emails[user.email] = true
         }
       }
     }
@@ -273,7 +337,7 @@ async function main(redis) {
   if (!users.length) return
 
   const results = {}
-  let hashes = await getHashes(redis, users)
+  const hashes = await getHashes(redis, users)
   
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)
@@ -316,5 +380,5 @@ async function main(redis) {
 }
 
 
-module.exports = { main, compare, readLinks, writeLinks, getNewLinks, urlBuilder }
+module.exports = { main, compare, readLinks, writeLinks, getNewLinks, urlBuilder, getHashes, getAllUsers }
 
