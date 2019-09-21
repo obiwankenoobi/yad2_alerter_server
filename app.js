@@ -6,10 +6,7 @@ const cookieParser = require('cookie-parser')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const dotenv = require('dotenv')
-const  redis = require('redis')
-const bluebird = require('bluebird')
-bluebird.promisifyAll(redis)
-client = redis.createClient()
+const { client } = require('./db/redisClient')
 const { main } = require('./services/crawler.js')
 
 dotenv.config()
@@ -37,6 +34,7 @@ const limiter = new RateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   delayMs: 0 // disable delaying - full speed until the max limit is reached
 })
+
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'))
@@ -68,7 +66,7 @@ app.use(cors())
 app.use('/auth', auth)
 app.use('/alerts', alerts)
 
-main(client)
+//main(client)
 setInterval(main, minToMs(1), client)
 
 function minToMs(min) {

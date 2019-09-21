@@ -241,15 +241,8 @@ function compare(prevLinks, currentLinks) {
   return getNewLinks(prevLinks, currentLinks)
 }
 
-async function main(redis) {
-
-  const users = await getAllUsers()
-
-  if (!users.length) return
-
-  const results = {}
+async function getHashes(redis, users) {
   let hashes = await redis.getAsync('hashes')
-  console.log('%%%%hashes%%%%', hashes)
   if (!hashes) {
     const hashesTmp = {}
     for(let user of users) {
@@ -270,7 +263,17 @@ async function main(redis) {
   } else {
     hashes = JSON.parse(hashes);
   }
+  return hashes
+}
 
+async function main(redis) {
+
+  const users = await getAllUsers()
+
+  if (!users.length) return
+
+  const results = {}
+  let hashes = await getHashes(redis, users)
   
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)
@@ -285,28 +288,23 @@ async function main(redis) {
     }
 
     try {
-      console.log('expend feed')
       const token = await expendFeed(nightmare, config);
 
-      console.log('get links')
       // get links from yad2
       const newLinks = await getLinks(nightmare)
 
-      console.log('add links 1')
       // write links to file
       await addLinks(token, newLinks, 'new')
 
-      console.log('read links')
       //const newLinks = await readLinks(token, 'new')
       const oldLinks = await readLinks(token, 'old')
 
-      console.log('add links 2')
       // replace old links with the new one's
       await addLinks(token, newLinks, 'old')
 
-      console.log('get new links')
-      // get new files
+      // get new links
       const foundLinks = getNewLinks(oldLinks, newLinks)
+      
       results[token] = {foundLinks, emails:hashes[hash].emails}
       console.log('results:\n', results)
     } catch(e) {
