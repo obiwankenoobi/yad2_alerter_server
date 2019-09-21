@@ -65,7 +65,7 @@ app.use('/auth', auth)
 app.use('/alerts', alerts)
 
 main()
-setInterval(main, minToMs(1))
+setInterval(main, minToMs(5))
 
 function minToMs(min) {
   return 1000 * 60 * min

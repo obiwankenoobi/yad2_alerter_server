@@ -85,24 +85,25 @@ function addNewSearch(url, hash) {
 }
 
 function addLinks(hash, links, state) {
- 
+  
   return new Promise((resolve, reject) => {
-    if (!links.length) return resolve()
+    if (!links.length) return reject()
     Search.findOne({ hash }, (error, searchObj) => {
       if (error) {
         console.log(error)
         return reject({error})
       }
       if (!searchObj) {
-        return reject('no user')
+        console.log('no search with hash: ', hash)
+        return reject('no hash')
       }
 
 
       // prevent from updating the links when there was some 
       // problem with the headless browser and it couldn't
       // get all links from the page
-      if (state === 'old' && searchObj.searches['old'] && searchObj.searches['old'].length > links.length) return
-
+      // if (state === 'old' && searchObj.searches['old'] && searchObj.searches['old'].length > links.length) return
+      
       searchObj.searches[state] = links
       searchObj.markModified('searches');
       searchObj.save((error, doc) => {
@@ -126,9 +127,9 @@ async function expendFeed(instance, config) {
     
     const list = await instance
     .goto(url)
-    .on('console', (log, msg) => {
-      console.log(msg)
-    })
+    // .on('console', (log, msg) => {
+    //   console.log(msg)
+    // })
     .wait('.feed_list')
     .evaluate(async () => {
   
@@ -139,13 +140,25 @@ async function expendFeed(instance, config) {
       const textNodes = []
       
       for(let i = 0; i < children.length; i++) {
+        
         // ignoring sponsored links
         if (children[i].querySelector(adFinderQuery)) {
           console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
           console.log('@@@@@@@@@@@@@ ad alert @@@@@@@@@@@@@')
           console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
           continue;
-        } else {
+        } 
+        
+        // else if (config.ignoreAgencies) {
+        //   if (children[i].querySelector(agencyFinderQuery)) {
+        //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+        //     console.log('@@@@@@@@@@@ agency alert @@@@@@@@@@@')
+        //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+        //     continue;
+        //   }
+        // } 
+        
+        else {
           const el = children[i].querySelector(clickableItemQuery)
           if (el) await el.click()
         }
@@ -250,42 +263,50 @@ async function main(req, res, next) {
       }
     }
   }
-
+  
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)
-    const nightmare = Nightmare({ show: true, waitTimeout: 5000 })
+    const nightmare = Nightmare({ show: true, waitTimeout: 10000 })
     const config = {
       neighborhood:url.neighborhood,
       fromPrice:url.price.split('-')[0],
       toPrice:url.price.split('-')[1],
       fromRooms:url.rooms.split('-')[0],
       toRooms:url.rooms.split('-')[1],
+      ignoreAgencies:true
     }
 
     try {
+      console.log('expend feed')
       const token = await expendFeed(nightmare, config);
 
+      console.log('get links')
       // get links from yad2
       const newLinks = await getLinks(nightmare)
 
+      console.log('add links 1')
       // write links to file
       await addLinks(token, newLinks, 'new')
 
+      console.log('read links')
       //const newLinks = await readLinks(token, 'new')
       const oldLinks = await readLinks(token, 'old')
 
+      console.log('add links 2')
       // replace old links with the new one's
       await addLinks(token, newLinks, 'old')
 
+      console.log('get new links')
       // get new files
       const foundLinks = getNewLinks(oldLinks, newLinks)
-      results[token] = {foundLinks, emails:hash.emails}
+      results[token] = {foundLinks, emails:hashes[hash].emails}
+      console.log('results:\n', results)
     } catch(e) {
       console.log({error:e})
     }
   }
+
   console.log(JSON.stringify(results, null, 2))
-  //console.log(JSON.stringify(hashes, null, 2))
 }
 
 
