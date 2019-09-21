@@ -241,28 +241,36 @@ function compare(prevLinks, currentLinks) {
   return getNewLinks(prevLinks, currentLinks)
 }
 
-async function main(req, res, next) {
-  console.log('start')
-  
+async function main(redis) {
+
   const users = await getAllUsers()
 
   if (!users.length) return
 
   const results = {}
-  const hashes = {}
-  for(let user of users) {
-    const email = user.email
-    for(let id in user.alerts) {
-      if (!hashes[id]) {
-        hashes[id] = {
-          url:user.alerts[id],
-          emails:[user.email]
+  let hashes = await redis.getAsync('hashes')
+  console.log('%%%%hashes%%%%', hashes)
+  if (!hashes) {
+    const hashesTmp = {}
+    for(let user of users) {
+      const email = user.email
+      for(let id in user.alerts) {
+        if (!hashesTmp[id]) {
+          hashesTmp[id] = {
+            url:user.alerts[id],
+            emails:[user.email]
+          }
+        } else {
+          hashesTmp[id].emails.push(user.email)
         }
-      } else {
-        hashes[id].emails.push(user.email)
       }
     }
+    await redis.setAsync('hashes', JSON.stringify(hashesTmp))
+    hashes = hashesTmp;
+  } else {
+    hashes = JSON.parse(hashes);
   }
+
   
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)

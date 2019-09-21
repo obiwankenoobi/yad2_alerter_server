@@ -6,6 +6,10 @@ const cookieParser = require('cookie-parser')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const dotenv = require('dotenv')
+const  redis = require('redis')
+const bluebird = require('bluebird')
+bluebird.promisifyAll(redis)
+client = redis.createClient()
 const { main } = require('./services/crawler.js')
 
 dotenv.config()
@@ -64,8 +68,8 @@ app.use(cors())
 app.use('/auth', auth)
 app.use('/alerts', alerts)
 
-main()
-setInterval(main, minToMs(5))
+main(client)
+setInterval(main, minToMs(1), client)
 
 function minToMs(min) {
   return 1000 * 60 * min
