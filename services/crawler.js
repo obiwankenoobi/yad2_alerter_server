@@ -5,28 +5,21 @@ const Nightmare = require('nightmare')
 const { exec } = require('child_process')
 const jwt = require('jsonwebtoken')
 const stringHash = require('string-hash')
+const sendEmail = require('./sendEmail')
 const _ = require('lodash')
 const { createUrl } = require('../utils/utils')
 
+
 /**
- * return all users from database
+ * @typedef User
+ * @property {String} email 
+ * @property {Object} alerts
  */
-function getAllUsers() {
-  return new Promise((resolve, reject) => {
-    User.find((error, users) => {
-      if (error) return reject(error)
-      resolve(users)
-    })
-  })
-}
-
-
 /**
  * @typedef {Object} UrlObject
  * @property {String} url the url that was created
  * @property {String} token the hash of the url
  */
-
 /**
  * @typedef {Object} SearchConfig
  * @property {String} neighborhood string with the id of neighborhood
@@ -36,10 +29,20 @@ function getAllUsers() {
  * @property {Number} toRooms limit rooms 
  * @property {Boolean} ignoreAgencies ignore agencies listing
  */
-
-
 /**
- * 
+ * return all users from database
+ * @returns {Array<User>}
+ */
+function getAllUsers() {
+  return new Promise((resolve, reject) => {
+    User.find((error, users) => {
+      if (error) return reject(error)
+      resolve(users)
+    })
+  })
+}
+/**
+ * function to build url for the search
  * @param {SearchConfig} config object with search config
  * @returns {UrlObject} { url}
  */
@@ -59,13 +62,13 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
     throw new Error('No such neighborhood')
   }
  
-  const url = createUrl(neighborhood, fromPrice, toPrice, fromRooms, toRooms)
-  console.log('url: ', url)
+  const url = 
+    createUrl(neighborhood, fromPrice, toPrice, fromRooms, toRooms)
+  
   const token = stringHash(url)
+
   return { url, token }
 }
-
-
 /**
  * function to add new search term to db
  * @param {String} url the url to crawl
@@ -75,19 +78,11 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
 function addNewSearch(url, hash) {
   return new Promise((resolve, reject) => {
     Search.findOne({ hash }, (error, searchObj) => {
-      if (error) {
-        return reject({error})
-      }
-
+      if (error) return reject({ error })
       if (!searchObj) {
-        const newSearch = new Search({
-          hash, 
-          url,
-          searches:{
-            old:[],
-            new:[]
-          }
-        })
+        const newSearch = 
+          new Search({ hash, url, searches:{ old:[], new:[] } })
+
         newSearch.save((error, doc) => {
           if (error) {
             console.log(error)
@@ -107,7 +102,6 @@ function addNewSearch(url, hash) {
     })
   })
 }
-
 /**
  * function to add links to db
  * @param {String} hash hash of the url to crawl
@@ -115,7 +109,6 @@ function addNewSearch(url, hash) {
  * @param {String} state can be 'old' | 'new' based on the place it called
  */
 function addLinks(hash, links, state) {
-  
   return new Promise((resolve, reject) => {
     if (!links.length) return reject()
     Search.findOne({ hash }, (error, searchObj) => {
@@ -146,18 +139,12 @@ function addLinks(hash, links, state) {
     })
   })
 }
-
-
-
-
-
 /**
  * function to open yad2 and expend the listing
  * @param {Nightmare} instance instance of nightmare
  * @param {SearchConfig} config search config
  */
 async function expendFeed(instance, config) {
-  
   try {
     const { url, token } = urlBuilder(config)
 
@@ -165,9 +152,6 @@ async function expendFeed(instance, config) {
     
     const list = await instance
     .goto(url)
-    // .on('console', (log, msg) => {
-    //   console.log(msg)
-    // })
     .wait('.feed_list')
     .evaluate(async () => {
   
@@ -207,8 +191,6 @@ async function expendFeed(instance, config) {
     return null
   }
 }
-
-
 /**
  * function to get links of listing from yad2
  * @param {Nightmare} instance instance of nightmare
@@ -238,7 +220,6 @@ async function getLinks(instance) {
 
   return links
 }
-
 /**
  * function to write links into file
  * @param {Array} links array of links to write
@@ -250,7 +231,6 @@ function writeLinks(links, fileName) {
     exec(`echo ${link} >> ${fileName}`)
   })
 }
-
 /**
  * function to read links from search term in db
  * @param {String} hash hash of the search to read from
@@ -269,7 +249,6 @@ function readLinks(hash, state) {
     })
   })
 }
-
 /**
  * function to compare between two list and return the difference as the new links
  * @param {Array} prevLinks links that already exist in db
@@ -277,7 +256,6 @@ function readLinks(hash, state) {
  * @returns {Array} array of new listings
  */
 function getNewLinks(prevLinks, currentLinks) {
-  console.log({ prevLinks, currentLinks })
   const newLinks = {}
 
   currentLinks.forEach(link => {
@@ -294,12 +272,15 @@ function getNewLinks(prevLinks, currentLinks) {
 
   return Object.keys(newLinks)
 }
-
+/**
+ * function that returns new links from the website
+ * @param {Array} prevLinks the links that already exist
+ * @param {Array} currentLinks new links to compare
+ * @returns {Array} of new IDs
+ */
 function compare(prevLinks, currentLinks) {
   return getNewLinks(prevLinks, currentLinks)
 }
-
-
 /**
  * function to get search hashes from signed users
  * @param {Redis} redis redis instance
@@ -315,7 +296,7 @@ async function getHashes(redis, users) {
         if (!hashesTmp[id]) {
           hashesTmp[id] = {
             url:user.alerts[id],
-            emails:{[user.email]:true}
+            emails:{ [user.email]: true }
           }
         } else {
           hashesTmp[id].emails[user.email] = true
@@ -341,7 +322,7 @@ async function main(redis) {
   
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)
-    const nightmare = Nightmare({ show: true, waitTimeout: 10000 })
+    const nightmare = Nightmare({ show: false, waitTimeout: 10000 })
     const config = {
       neighborhood:url.neighborhood,
       fromPrice:url.price.split('-')[0],
@@ -369,15 +350,41 @@ async function main(redis) {
       // get new links
       const foundLinks = getNewLinks(oldLinks, newLinks)
       
-      results[token] = {foundLinks, emails:hashes[hash].emails}
+      results[token] = { foundLinks, emails:hashes[hash].emails }
       console.log('results:\n', results)
+
+      // send links to emails
+      sendLinks(results)
     } catch(e) {
-      console.log({error:e})
+      console.log({ error: e })
     }
   }
 
   console.log(JSON.stringify(results, null, 2))
+
 }
+
+
+function sendLinks(results) {
+  console.log('send emails:\n', results)
+  for(let hash in results) {
+    for(let email in results[hash].emails) {
+      const linksFound = results[hash].foundLinks
+
+      if (!linksFound.length) return 
+
+      console.log('send email to:\n', email)
+      const emailObj = {
+        fromEmail:'dev@inlyne.co',
+        toEmail: email,
+        subject:'hello world', 
+        text: linksFound.map(id => 'https://www.yad2.co.il/item/'.concat(id) + '\n').toString().replace(/,/g, ''),
+        html:''
+      }
+      sendEmail(emailObj).catch(console.error)
+    }
+  }
+} 
 
 
 module.exports = { main, compare, readLinks, writeLinks, getNewLinks, urlBuilder, getHashes, getAllUsers }

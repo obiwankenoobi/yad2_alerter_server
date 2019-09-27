@@ -12,26 +12,33 @@ const { getHashes, getAllUsers } = require('../services/crawler')
  * @returns {Function} return function with redis instance in scope
  */
 function createAlert(redis, hashes = {}) {
-  return function(req, res, next) {
+  return async function(req, res, next) {
     const { body: { email, alerts } } = req
-    return new Promise((resolve, reject) => {
-      User.findOne({ email }, async (error, user) => {
-        if (error) {
-          console.log(error)
-          return res.status(500).json({error})
-        }
+    //return new Promise((resolve, reject) => {
+      //User.findOne({ email }, async (error, user) => {
+        // if (error) {
+        //   console.log(error)
+        //   return res.status(500).json({error})
+        // }
         const links = {}
         for(let alert of alerts) {
           const url = createUrl(alert.neighborhood.value, alert.fromPrice.value, alert.toPrice.value, alert.fromRooms.value, alert.toRooms.value)
           const hash = stringHash(url)
           links[hash] = url
-          await updateAlertInRedis(redis, hash, hashes, email, url) 
+          //await updateAlertInRedis(redis, hash, hashes, email, url) 
         }
-    
-        User.create({email, alerts:links})
-        return res.status(200).json({message:'alerts saved'})
-      })
-    })
+
+        console.log('links to update', links)
+        const savedAlerts = await User.create({ email, alerts:links })
+        console.log('savedAlerts', savedAlerts)
+
+        for(let hash in links) {
+          await updateAlertInRedis(redis, hash, hashes, email, links[hash]) 
+        }
+
+        return res.status(200).json({ message:'alerts saved' })
+      //})
+    //})
   }
 }
 
@@ -47,6 +54,7 @@ async function updateAlertInRedis(redis, hash, hashes, email, url) {
   let readyHashes = hashes
   if (!readyHashes) {
     const users = await getAllUsers()
+    console.log('this is users:\n', users)
     const hashes = await getHashes(redis, users)
     readyHashes = hashes
   }

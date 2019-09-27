@@ -3,6 +3,8 @@ const { main } = require('../services/crawler')
 const express = require("express")
 const router = express.Router()
 const { client, addRedis } = require('../db/redisClient')
+const { sendEmail } = require('../services/sendEmail')
+
 const addAlertsWithRedis = addRedis(addAlert, client)
 
 router.post('/add', addAlertsWithRedis)
