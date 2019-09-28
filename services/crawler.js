@@ -35,8 +35,11 @@ const { createUrl } = require('../utils/utils')
  */
 function getAllUsers() {
   return new Promise((resolve, reject) => {
-    User.find((error, users) => {
-      if (error) return reject(error)
+    User.find((e, users) => {
+      if (e) {
+        console.log(e)
+        return reject(e)
+      }
       resolve(users)
     })
   })
@@ -76,6 +79,7 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
  * @returns {Promise}
  */
 function addNewSearch(url, hash) {
+  console.log('adding new search')
   return new Promise((resolve, reject) => {
     Search.findOne({ hash }, (error, searchObj) => {
       if (error) return reject({ error })
@@ -85,6 +89,7 @@ function addNewSearch(url, hash) {
 
         newSearch.save((error, doc) => {
           if (error) {
+            console.log('error in saving doc')
             console.log(error)
             reject(error)
           }
@@ -94,6 +99,7 @@ function addNewSearch(url, hash) {
         searchObj.save((error, doc) => {
           if (error) {
             console.log(error)
+            console.log('error in saving doc')
             reject(error)
           }
           resolve('searches saved')
@@ -149,7 +155,7 @@ async function expendFeed(instance, config) {
     const { url, token } = urlBuilder(config)
 
     await addNewSearch(url, token)
-    
+    console.log('expending feed')
     const list = await instance
     .goto(url)
     .wait('.feed_list')
@@ -188,6 +194,8 @@ async function expendFeed(instance, config) {
     })
     return token
   } catch(e) {
+    console.log('error in expending feed')
+    console.log(e)
     return null
   }
 }
@@ -312,17 +320,17 @@ async function getHashes(redis, users) {
 }
 
 async function main(redis) {
-
+  console.log('starting')
   const users = await getAllUsers()
 
   if (!users.length) return
 
   const results = {}
   const hashes = await getHashes(redis, users)
-  
+  console.log('hashes found:\n', hashes)
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)
-    const nightmare = Nightmare({ show: false, waitTimeout: 10000 })
+    const nightmare = Nightmare({ show: true, waitTimeout: 10000 })
     const config = {
       neighborhood:url.neighborhood,
       fromPrice:url.price.split('-')[0],
@@ -335,18 +343,23 @@ async function main(redis) {
     try {
       const token = await expendFeed(nightmare, config);
 
+      console.log('getting links')
       // get links from yad2
       const newLinks = await getLinks(nightmare)
 
+      console.log('adding links')
       // write links to file
       await addLinks(token, newLinks, 'new')
 
+      console.log('getting old links')
       //const newLinks = await readLinks(token, 'new')
       const oldLinks = await readLinks(token, 'old')
 
+      console.log('adding new links to db')
       // replace old links with the new one's
       await addLinks(token, newLinks, 'old')
 
+      console.log('calculating new results')
       // get new links
       const foundLinks = getNewLinks(oldLinks, newLinks)
       
@@ -356,6 +369,7 @@ async function main(redis) {
       // send links to emails
       sendLinks(results)
     } catch(e) {
+      console.log('error detected')
       console.log({ error: e })
     }
   }

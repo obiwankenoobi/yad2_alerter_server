@@ -1,0 +1,38 @@
+version: "3"
+services:
+  web:
+    build: .
+    ports:
+      - "3001:3001"
+    # networks:
+    #   - webnet
+    links:
+      - mongodb
+      - redis
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+  redis:
+    image: redis
+    container_name: cache
+    ports:
+      - "6379:6379"
+    command:
+      redis-server
+  mongodb:
+    image: mongo
+    ports:
+      - "27017:27017"
+    expose:
+      - "27017"
+    # networks:
+    #   - webnet
+# networks:
+#   webnet:
+#     driver: bridge

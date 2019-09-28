@@ -1,7 +1,7 @@
 const  redis = require('redis')
 const bluebird = require('bluebird')
 bluebird.promisifyAll(redis)
-client = redis.createClient()
+client = redis.createClient('redis://cache:6379')
 
 /**
  * a function that injects redis into it to use in its scope

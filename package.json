@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "nodemon ./bin/www"
+    "dev": "nodemon ./bin/www",
+    "start": "node ./bin/www",
+    "build-docker":"docker build -t yad2_alerter_run .",
+    "start-docker":"docker run -p 4000:3001 yad2_alerter_run"
   },
   "dependencies": {
     "bluebird": "^3.5.5",

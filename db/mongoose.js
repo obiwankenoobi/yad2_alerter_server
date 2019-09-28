@@ -3,6 +3,7 @@ let mongoose = require("mongoose");
 
 // checking for enviroment var for the mongo server and connect to it if there is one
 // if there isnt connect to localhost
+let attempts = 0
 if (process.env.MONGO_DB_ADDRESS) {
   mongoose
     .connect(process.env.MONGO_DB_ADDRESS, {
@@ -14,16 +15,19 @@ if (process.env.MONGO_DB_ADDRESS) {
     .then(() => console.log("connection successful"))
     .catch(err => console.error(err));
 } else {
-  const url = "mongodb://localhost:27017/db";
-  mongoose.connect(
-    url,
-    {
-      useNewUrlParser: true
-    },
-    console.log("connected to mongo")
-  );
+  const url = "mongodb://mongodb:27017/db0";
+  connect(url)
 }
 
+function connect(url) {
+  mongoose.connect(url, { useNewUrlParser: true })
+    .then(() => console.log("connection successful"))
+    .catch(err => {
+      console.error(err)
+      attempts++
+      if (attempts < 10) connect(url)
+    });
+}
 //@@@@@@@@@@@@@ if you use local host @@@@@@@@@@@@@@@@@
 // var url = "mongodb://localhost:27017/db";
 // mongoose.connect(url, { useNewUrlParser: true }, console.log('connected to mongo'));

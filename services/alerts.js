@@ -51,18 +51,24 @@ function createAlert(redis, hashes = {}) {
  * @param {String} url url of the search 
  */
 async function updateAlertInRedis(redis, hash, hashes, email, url) {
-  let readyHashes = hashes
+  let readyHashes = JSON.parse(hashes)
   if (!readyHashes) {
     const users = await getAllUsers()
     console.log('this is users:\n', users)
     const hashes = await getHashes(redis, users)
     readyHashes = hashes
   }
-  
+  console.log('this is hashes:\n', readyHashes)
+  console.log('this is hashes type:\n', typeof readyHashes)
+  console.log('this is data:\n', {redis, hash, hashes, email, url})
   if (readyHashes[hash]) {
     readyHashes[hash].emails[email] = true
   } else {
+    readyHashes[hash] = {}
+
     readyHashes[hash].url = url
+
+    readyHashes[hash].emails = {}
     readyHashes[hash].emails[email] = true
   }
   await redis.setAsync('hashes', JSON.stringify(readyHashes))
