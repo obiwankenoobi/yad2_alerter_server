@@ -4,8 +4,6 @@ services:
     build: .
     ports:
       - "3001:3001"
-    # networks:
-    #   - webnet
     links:
       - mongodb
       - redis
@@ -25,14 +23,11 @@ services:
       - "6379:6379"
     command:
       redis-server
+    volumes:
+      - ./data:/data
   mongodb:
     image: mongo
     ports:
       - "27017:27017"
     expose:
       - "27017"
-    # networks:
-    #   - webnet
-# networks:
-#   webnet:
-#     driver: bridge
