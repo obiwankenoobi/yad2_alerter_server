@@ -1,13 +1,15 @@
-const { User } = require('../db/models/UserSchema')
-const { Search } = require('../db/models/SearchesSchema')
 const urlParser = require('query-string')
 const Nightmare = require('nightmare')
 const { exec } = require('child_process')
 const jwt = require('jsonwebtoken')
 const stringHash = require('string-hash')
-const sendEmail = require('./sendEmail')
+const hashFunc = require('object-hash')
 const _ = require('lodash')
+
+const { User } = require('../db/models/UserSchema')
+const { Search } = require('../db/models/SearchesSchema')
 const { createUrl } = require('../utils/utils')
+const sendEmail = require('./sendEmail')
 
 
 /**
@@ -68,9 +70,9 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
   const url = 
     createUrl(neighborhood, fromPrice, toPrice, fromRooms, toRooms)
   
-  const token = stringHash(url)
+  const hash = stringHash(url)
 
-  return { url, token }
+  return { url, hash }
 }
 /**
  * function to add new search term to db
@@ -152,9 +154,9 @@ function addLinks(hash, links, state) {
  */
 async function expendFeed(instance, config) {
   try {
-    const { url, token } = urlBuilder(config)
+    const { url, hash } = urlBuilder(config)
 
-    await addNewSearch(url, token)
+    await addNewSearch(url, hash)
     console.log('expending feed')
     const list = await instance
     .goto(url)
@@ -192,7 +194,7 @@ async function expendFeed(instance, config) {
         }
       }
     })
-    return token
+    return hash
   } catch(e) {
     console.log('error in expending feed')
     console.log(e)
@@ -319,6 +321,41 @@ async function getHashes(redis, users) {
   return hashes
 }
 
+/**
+ * function to set hashed results in redis
+ * @param {Redis} redis instance of redis
+ * @param {Object} newSearches new hashed results exmp: { <searcUrlHash>:<resultsHash> }
+ */
+async function addSearchResultHashToRedis(redis, newSearches) {
+  const hashedSearchResults = await redis.getAsync('hashedSearchResults')
+  try {
+    if (hashedSearchResults) {
+      const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
+      const hashedSearchResultsObjNext = { ...hashedSearchResultsObj, ...newSearches }
+      console.log({ hashedSearchResultsObjNext, newSearches })
+      await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObjNext))
+    } else {
+      await redis.setAsync('hashedSearchResults', JSON.stringify(newSearches))
+    }
+  } catch(e) {
+    Promise.reject(new Error(e))
+  }
+}
+
+function getSearchResultsHashFromRedis(redis, hash) {
+  return new Promise( async (resolve, reject) => {
+    const hashedSearchResults = await redis.getAsync('hashedSearchResults')
+
+    if (hashedSearchResults) {
+      const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
+      console.log({ hashedSearchResults, hash, hashedSearchResultsObj })
+      return resolve(hashedSearchResultsObj[hash])
+    } else {
+      resolve(null)
+    }
+  })
+}
+
 async function main(redis) {
   console.log('starting')
   const users = await getAllUsers()
@@ -341,33 +378,42 @@ async function main(redis) {
     }
 
     try {
-      const token = await expendFeed(nightmare, config);
+      const searchedUrlHash = await expendFeed(nightmare, config);
 
       console.log('getting links')
       // get links from yad2
       const newLinks = await getLinks(nightmare)
+      const oldHashedResults = await getSearchResultsHashFromRedis(redis, searchedUrlHash)
+      const newHashedResults = hashFunc(newLinks)
 
-      console.log('adding links')
-      // write links to file
-      await addLinks(token, newLinks, 'new')
+      if (!oldHashedResults) {
+        await addSearchResultHashToRedis(redis, { [hash]: newHashedResults })
+      } else {
+        if (oldHashedResults === newHashedResults) return
+        // setting hash of thee results for the current search
+        await addSearchResultHashToRedis(redis, { [hash]: newHashedResults })
+        console.log('adding links')
+        // write links to db
+        await addLinks(searchedUrlHash, newLinks, 'new')
 
-      console.log('getting old links')
-      //const newLinks = await readLinks(token, 'new')
-      const oldLinks = await readLinks(token, 'old')
-
-      console.log('adding new links to db')
-      // replace old links with the new one's
-      await addLinks(token, newLinks, 'old')
-
-      console.log('calculating new results')
-      // get new links
-      const foundLinks = getNewLinks(oldLinks, newLinks)
-      
-      results[token] = { foundLinks, emails:hashes[hash].emails }
-      console.log('results:\n', results)
-
-      // send links to emails
-      sendLinks(results)
+        console.log('getting old links')
+        //const newLinks = await readLinks(searchedUrlHash, 'new')
+        const oldLinks = await readLinks(searchedUrlHash, 'old')
+  
+        console.log('adding new links to db')
+        // replace old links with the new one's
+        await addLinks(searchedUrlHash, newLinks, 'old')
+  
+        console.log('calculating new results')
+        // get new links
+        const foundLinks = getNewLinks(oldLinks, newLinks)
+        
+        results[searchedUrlHash] = { foundLinks, emails:hashes[hash].emails }
+        console.log('results:\n', results)
+  
+        // send links to emails
+        sendLinks(results)
+      }
     } catch(e) {
       console.log('error detected')
       console.log({ error: e })
