@@ -38,11 +38,10 @@ async function main() {
 
   const results = {}
   const hashes = await getHashes(users)
-  // console.log('hashes found:')
-  // print(hashes)
+
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)
-    const nightmare = Nightmare({ show: true, waitTimeout: 10000 })
+    const nightmare = Nightmare({ show: false, waitTimeout: 10000 })
     const config = {
       neighborhood:url.neighborhood,
       fromPrice:url.price.split('-')[0],
@@ -53,10 +52,9 @@ async function main() {
     }
 
     try {
-      const searchedUrlHash = await expendFeed(nightmare, config);
+      // expending feed to get access to links
+      const searchedUrlHash = await expendFeed(nightmare, config);    
 
-      console.log('getting links from: ', hashes[hash].url)
-      
       // get links from yad2
       const newLinks = await getLinks(nightmare)
       const oldHashedResults = await getSearchResultsHashFromRedis(hash)
@@ -79,20 +77,19 @@ async function main() {
         // fake find 10 new links because it will think 
         // these extra 10 are new
         console.log(`oldLinksLength: ${oldLinksLength}\n newLinks.length: ${newLinks.length}`)
-        if (oldLinksLength > 3 && oldLinksLength - newLinks.length > 3) return
+        if (oldLinksLength > 3 && oldLinksLength - newLinks.length > 3) continue
         
         // if there is no change in results return
-        if (oldHashedResults.searchedResultHash === newHashedResults) return
+        if (oldHashedResults.searchedResultHash === newHashedResults) continue
 
-        // setting hash of thee results for the current search
+        // setting hash of the results for the current search
         await addSearchResultHashToRedis(hash, newHashedResults, newLinks.length, hashes[hash].url)
 
-        // write links to db//
+        // write links to db
         await addLinks(hash, newLinks, 'new')
 
         // read old links
         const readLinksWithSchema = readLinks(Search)
-
         const oldLinks = await readLinksWithSchema(hash, 'old')
   
         // replace old links with the new one's
