@@ -51,7 +51,7 @@ function createAlert(redis, hashes = {}) {
  * @param {String} url url of the search 
  */
 async function updateAlertInRedis(redis, hash, hashes, email, url) {
-  let readyHashes = JSON.parse(hashes)
+  let readyHashes = typeof hashes !== 'object' ? JSON.parse(hashes) : hashes
   if (!readyHashes) {
     const users = await getAllUsers()
     console.log('this is users:\n', users)

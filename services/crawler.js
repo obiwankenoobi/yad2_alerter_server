@@ -8,7 +8,7 @@ const _ = require('lodash')
 
 const { User } = require('../db/models/UserSchema')
 const { Search } = require('../db/models/SearchesSchema')
-const { createUrl } = require('../utils/utils')
+const { createUrl, print } = require('../utils/utils')
 const sendEmail = require('./sendEmail')
 
 
@@ -39,7 +39,7 @@ function getAllUsers() {
   return new Promise((resolve, reject) => {
     User.find((e, users) => {
       if (e) {
-        console.log(e)
+        print(e)
         return reject(e)
       }
       resolve(users)
@@ -70,7 +70,7 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
   const url = 
     createUrl(neighborhood, fromPrice, toPrice, fromRooms, toRooms)
   
-  const hash = stringHash(url)
+  const hash = stringHash(url).toString()
 
   return { url, hash }
 }
@@ -81,7 +81,6 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
  * @returns {Promise}
  */
 function addNewSearch(url, hash) {
-  console.log('adding new search')
   return new Promise((resolve, reject) => {
     Search.findOne({ hash }, (error, searchObj) => {
       if (error) return reject({ error })
@@ -91,8 +90,7 @@ function addNewSearch(url, hash) {
 
         newSearch.save((error, doc) => {
           if (error) {
-            console.log('error in saving doc')
-            console.log(error)
+            print(error)
             reject(error)
           }
           resolve('searches saved')
@@ -100,8 +98,7 @@ function addNewSearch(url, hash) {
       } else {
         searchObj.save((error, doc) => {
           if (error) {
-            console.log(error)
-            console.log('error in saving doc')
+            print(error)
             reject(error)
           }
           resolve('searches saved')
@@ -121,25 +118,18 @@ function addLinks(hash, links, state) {
     if (!links.length) return reject()
     Search.findOne({ hash }, (error, searchObj) => {
       if (error) {
-        console.log(error)
+        print(error)
         return reject({error})
       }
       if (!searchObj) {
-        console.log('no search with hash: ', hash)
         return reject('no hash')
       }
 
-
-      // prevent from updating the links when there was some 
-      // problem with the headless browser and it couldn't
-      // get all links from the page
-      // if (state === 'old' && searchObj.searches['old'] && searchObj.searches['old'].length > links.length) return
-      
       searchObj.searches[state] = links
       searchObj.markModified('searches');
       searchObj.save((error, doc) => {
         if (error) {
-          console.log(error)
+          print(error)
           reject(error)
         }
         resolve('searches saved')
@@ -157,8 +147,11 @@ async function expendFeed(instance, config) {
     const { url, hash } = urlBuilder(config)
 
     await addNewSearch(url, hash)
-    console.log('expending feed')
+
     const list = await instance
+    .on('console', (log, msg) => {
+      console.log(msg)
+    })
     .goto(url)
     .wait('.feed_list')
     .evaluate(async () => {
@@ -179,7 +172,7 @@ async function expendFeed(instance, config) {
           continue;
         } 
         
-        // else if (config.ignoreAgencies) {
+        // if (config.ignoreAgencies) {
         //   if (children[i].querySelector(agencyFinderQuery)) {
         //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
         //     console.log('@@@@@@@@@@@ agency alert @@@@@@@@@@@')
@@ -196,8 +189,7 @@ async function expendFeed(instance, config) {
     })
     return hash
   } catch(e) {
-    console.log('error in expending feed')
-    console.log(e)
+    print(e)
     return null
   }
 }
@@ -326,16 +318,28 @@ async function getHashes(redis, users) {
  * @param {Redis} redis instance of redis
  * @param {Object} newSearches new hashed results exmp: { <searcUrlHash>:<resultsHash> }
  */
-async function addSearchResultHashToRedis(redis, newSearches) {
+async function addSearchResultHashToRedis(redis, hash, newHashedResults, newSearchesLength, url) {
   const hashedSearchResults = await redis.getAsync('hashedSearchResults')
   try {
     if (hashedSearchResults) {
       const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
-      const hashedSearchResultsObjNext = { ...hashedSearchResultsObj, ...newSearches }
-      console.log({ hashedSearchResultsObjNext, newSearches })
-      await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObjNext))
+      hashedSearchResultsObj[hash] = {
+        searchedResultHash: newHashedResults,
+        length:newSearchesLength,
+        url
+      }
+      print({ hashedSearchResultsObj })
+      await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))      
+      print(JSON.parse(await redis.getAsync('hashedSearchResults')))
     } else {
-      await redis.setAsync('hashedSearchResults', JSON.stringify(newSearches))
+      const hashedSearchResultsObj = {}
+      hashedSearchResultsObj[hash] = {
+        searchedResultHash: newHashedResults,
+        length:newSearchesLength,
+        url
+      }
+      await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))
+      print(JSON.parse(await redis.getAsync('hashedSearchResults')))
     }
   } catch(e) {
     Promise.reject(new Error(e))
@@ -345,10 +349,11 @@ async function addSearchResultHashToRedis(redis, newSearches) {
 function getSearchResultsHashFromRedis(redis, hash) {
   return new Promise( async (resolve, reject) => {
     const hashedSearchResults = await redis.getAsync('hashedSearchResults')
-
     if (hashedSearchResults) {
       const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
-      console.log({ hashedSearchResults, hash, hashedSearchResultsObj })
+      print({ hash, hashedSearchResultsObj })
+      console.log('getSearchResultsHashFromRedis returns:\n')
+      print(hashedSearchResultsObj[hash])
       return resolve(hashedSearchResultsObj[hash])
     } else {
       resolve(null)
@@ -364,7 +369,8 @@ async function main(redis) {
 
   const results = {}
   const hashes = await getHashes(redis, users)
-  console.log('hashes found:\n', hashes)
+  console.log('hashes found:\n')
+  print(hashes)
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)
     const nightmare = Nightmare({ show: true, waitTimeout: 10000 })
@@ -383,57 +389,71 @@ async function main(redis) {
       console.log('getting links')
       // get links from yad2
       const newLinks = await getLinks(nightmare)
-      const oldHashedResults = await getSearchResultsHashFromRedis(redis, searchedUrlHash)
+      const oldHashedResults = await getSearchResultsHashFromRedis(redis, hash)
       const newHashedResults = hashFunc(newLinks)
 
-      if (!oldHashedResults) {
-        await addSearchResultHashToRedis(redis, { [hash]: newHashedResults })
-      } else {
-        if (oldHashedResults === newHashedResults) return
-        // setting hash of thee results for the current search
-        await addSearchResultHashToRedis(redis, { [hash]: newHashedResults })
-        console.log('adding links')
-        // write links to db
-        await addLinks(searchedUrlHash, newLinks, 'new')
+      console.log('oldHashedResults:')
+      print(oldHashedResults)
 
-        console.log('getting old links')
-        //const newLinks = await readLinks(searchedUrlHash, 'new')
-        const oldLinks = await readLinks(searchedUrlHash, 'old')
+      if (!oldHashedResults) {
+        console.log('!oldHashedResults')
+        print({ hash, searchedUrlHash })
+        await addSearchResultHashToRedis(redis, hash, newHashedResults, newLinks.length, hashes[hash].url)
+      } else {
+        const oldLinksLength = oldHashedResults.length
+
+        // until i will think about better solution
+        // the issue is that sometimes Nightmare wont read 
+        // all links and instead of returning 20 links to db
+        // it will return only 10 and next time it crawl it will 
+        // fake find 10 new links because it will think 
+        // these extra 10 are new
+
+        console.log(`oldLinksLength: ${oldLinksLength}\n newLinks.length: ${newLinks.length}`)
+        
+        if (oldLinksLength > 3 && oldLinksLength - newLinks.length > 3) return
+
+        console.log(`oldLinksLength: ${oldLinksLength}\n newLinks.length: ${newLinks.length}`)
+
+        // if there is no change in results return
+        if (oldHashedResults.searchedResultHash === newHashedResults) return
+
+        // setting hash of thee results for the current search
+        await addSearchResultHashToRedis(redis, hash, newHashedResults, newLinks.length, hashes[hash].url)
+
+        // write links to db//
+        await addLinks(hash, newLinks, 'new')
+
+        // read old links
+        const oldLinks = await readLinks(hash, 'old')
   
-        console.log('adding new links to db')
         // replace old links with the new one's
-        await addLinks(searchedUrlHash, newLinks, 'old')
+        await addLinks(hash, newLinks, 'old')
   
-        console.log('calculating new results')
         // get new links
         const foundLinks = getNewLinks(oldLinks, newLinks)
         
-        results[searchedUrlHash] = { foundLinks, emails:hashes[hash].emails }
-        console.log('results:\n', results)
+        results[hash] = { foundLinks, emails:hashes[hash].emails }
+        console.log('results:\n')
+        print(results)
   
         // send links to emails
         sendLinks(results)
       }
     } catch(e) {
-      console.log('error detected')
-      console.log({ error: e })
+      print(e)
     }
   }
-
-  console.log(JSON.stringify(results, null, 2))
-
 }
 
 
 function sendLinks(results) {
-  console.log('send emails:\n', results)
   for(let hash in results) {
     for(let email in results[hash].emails) {
       const linksFound = results[hash].foundLinks
 
       if (!linksFound.length) return 
 
-      console.log('send email to:\n', email)
       const emailObj = {
         fromEmail:'dev@inlyne.co',
         toEmail: email,
