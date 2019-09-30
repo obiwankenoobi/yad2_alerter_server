@@ -32,17 +32,41 @@ const sendEmail = require('./sendEmail')
  * @property {Boolean} ignoreAgencies ignore agencies listing
  */
 /**
+ * @typedef {Object} HashResultsObject
+ * @property {String} url the url which hash linked to
+ * @property {String} searchedResultHash the hash of search results
+ * @property {Numbere} length the length of results
+ */
+/**
+ * @typedef {Object} HashObject
+ * @example
+ * {
+ *  "2626769505": {
+ *    "url": "https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-3000",
+ *    "emails": {
+ *      "artium1@gmail.com": true
+ *    }
+ *  },
+ *  "2626769504": {
+  *    "url": "https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-2000",
+  *    "emails": {
+  *      "a@b.c": true
+  *    }
+  *  }
+ * }
+ */
+/**
  * return all users from database
  * @returns {Array<User>}
  */
-function getAllUsers() {
+function getAllUsers(docSchema) {
   return new Promise((resolve, reject) => {
-    User.find((e, users) => {
+    docSchema.find((e, docs) => {
       if (e) {
         print(e)
         return reject(e)
       }
-      resolve(users)
+      resolve(docs)
     })
   })
 }
@@ -80,32 +104,34 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
  * @param {String} hash the hash of url to crawl
  * @returns {Promise}
  */
-function addNewSearch(url, hash) {
-  return new Promise((resolve, reject) => {
-    Search.findOne({ hash }, (error, searchObj) => {
-      if (error) return reject({ error })
-      if (!searchObj) {
-        const newSearch = 
-          new Search({ hash, url, searches:{ old:[], new:[] } })
-
-        newSearch.save((error, doc) => {
-          if (error) {
-            print(error)
-            reject(error)
-          }
-          resolve('searches saved')
-        })
-      } else {
-        searchObj.save((error, doc) => {
-          if (error) {
-            print(error)
-            reject(error)
-          }
-          resolve('searches saved')
-        })
-      }
+function addNewSearch(docSchema) {
+  return function(url, hash) {
+    return new Promise((resolve, reject) => {
+      docSchema.findOne({ hash }, (error, searchObj) => {
+        if (error) return reject({ error })
+        if (!searchObj) {
+          const newSearch = 
+            new docSchema({ hash, url, searches:{ old:[], new:[] } })
+  
+          newSearch.save((error, doc) => {
+            if (error) {
+              print(error)
+              reject(error)
+            }
+            resolve('searches saved')
+          })
+        } else {
+          searchObj.save((error, doc) => {
+            if (error) {
+              print(error)
+              reject(error)
+            }
+            resolve('searches saved')
+          })
+        }
+      })
     })
-  })
+  }
 }
 /**
  * function to add links to db
@@ -146,7 +172,8 @@ async function expendFeed(instance, config) {
   try {
     const { url, hash } = urlBuilder(config)
 
-    await addNewSearch(url, hash)
+    const addNewSearchWithSchema = addNewSearch(Search)
+    await addNewSearchWithSchema(url, hash)
 
     const list = await instance
     .on('console', (log, msg) => {
@@ -238,18 +265,20 @@ function writeLinks(links, fileName) {
  * @param {String} hash hash of the search to read from
  * @param {String} state can be 'old' | 'new' based on where it's called
  */
-function readLinks(hash, state) {
-  return new Promise((resolve, reject) => {
-    Search.findOne({ hash }, (error, searchObj) => {
-      if (error) {
-        return reject({error})
-      }
-      if (!searchObj) {
-        return reject('no user')
-      }
-      resolve(searchObj.searches[state])
+function readLinks(docSchema) {
+  return function(hash, state) {
+    return new Promise((resolve, reject) => {
+      docSchema.findOne({ hash }, (error, searchObj) => {
+        if (error) {
+          return reject({error})
+        }
+        if (!searchObj) {
+          return reject('no user')
+        }
+        resolve(searchObj.searches[state])
+      })
     })
-  })
+  }
 }
 /**
  * function to compare between two list and return the difference as the new links
@@ -275,18 +304,10 @@ function getNewLinks(prevLinks, currentLinks) {
   return Object.keys(newLinks)
 }
 /**
- * function that returns new links from the website
- * @param {Array} prevLinks the links that already exist
- * @param {Array} currentLinks new links to compare
- * @returns {Array} of new IDs
- */
-function compare(prevLinks, currentLinks) {
-  return getNewLinks(prevLinks, currentLinks)
-}
-/**
  * function to get search hashes from signed users
  * @param {Redis} redis redis instance
  * @param {Object} users object of users 
+ * @returns {HashObject} 
  */
 async function getHashes(redis, users) {
   let hashes = await redis.getAsync('hashes')
@@ -310,11 +331,13 @@ async function getHashes(redis, users) {
   } else {
     hashes = JSON.parse(hashes);
   }
+  console.log('hashes:')
+  print(hashes)
   return hashes
 }
 
 /**
- * function to set hashed results in redis
+ * function to set hash of the returned results in redis
  * @param {Redis} redis instance of redis
  * @param {Object} newSearches new hashed results exmp: { <searcUrlHash>:<resultsHash> }
  */
@@ -339,22 +362,30 @@ async function addSearchResultHashToRedis(redis, hash, newHashedResults, newSear
         url
       }
       await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))
-      print(JSON.parse(await redis.getAsync('hashedSearchResults')))
+      const hashed = JSON.parse(await redis.getAsync('hashedSearchResults'))
+      print(hashed)
+      return(hashed)
     }
   } catch(e) {
     Promise.reject(new Error(e))
   }
 }
 
-function getSearchResultsHashFromRedis(redis, hash) {
+/**
+ * function to return object with hash of results, length of results and the url of results
+ * @param {Redis} redis instance of redis
+ * @param {String} urlHash url hash by which to find the search hash
+ * @returns {HashResultsObject}
+ */
+function getSearchResultsHashFromRedis(redis, urlHash) {
   return new Promise( async (resolve, reject) => {
     const hashedSearchResults = await redis.getAsync('hashedSearchResults')
     if (hashedSearchResults) {
       const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
-      print({ hash, hashedSearchResultsObj })
+      print({ urlHash, hashedSearchResultsObj })
       console.log('getSearchResultsHashFromRedis returns:\n')
-      print(hashedSearchResultsObj[hash])
-      return resolve(hashedSearchResultsObj[hash])
+      print(hashedSearchResultsObj[urlHash])
+      return resolve(hashedSearchResultsObj[urlHash])
     } else {
       resolve(null)
     }
@@ -363,7 +394,7 @@ function getSearchResultsHashFromRedis(redis, hash) {
 
 async function main(redis) {
   console.log('starting')
-  const users = await getAllUsers()
+  const users = await getAllUsers(User)
 
   if (!users.length) return
 
@@ -425,7 +456,8 @@ async function main(redis) {
         await addLinks(hash, newLinks, 'new')
 
         // read old links
-        const oldLinks = await readLinks(hash, 'old')
+        const readLinksWithSchema = readLinks(Search)
+        const oldLinks = await readLinksWithSchema(hash, 'old')
   
         // replace old links with the new one's
         await addLinks(hash, newLinks, 'old')
@@ -467,5 +499,16 @@ function sendLinks(results) {
 } 
 
 
-module.exports = { main, compare, readLinks, writeLinks, getNewLinks, urlBuilder, getHashes, getAllUsers }
+module.exports = { 
+  main, 
+  readLinks, 
+  writeLinks, 
+  getNewLinks, 
+  urlBuilder, 
+  getHashes, 
+  getAllUsers, 
+  addNewSearch,
+  addSearchResultHashToRedis,
+  getSearchResultsHashFromRedis
+}
 
