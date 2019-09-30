@@ -1,13 +1,13 @@
 {
-  "name": "express-boilerplate",
+  "name": "yad2_alerter",
   "version": "0.0.0",
   "private": true,
   "scripts": {
     "dev": "nodemon ./bin/www",
     "start": "node ./bin/www",
-    "build-docker": "docker build -t yad2_alerter_run .",
-    "start-docker": "docker run -p 4000:3001 yad2_alerter_run",
-    "test": "jest --watch"
+    "build-docker": "docker-compose build && docker-compose up",
+    "test": "jest --watch",
+    "docs": "./node_modules/.bin/jsdoc ./services/ -d docs"
   },
   "dependencies": {
     "bluebird": "^3.5.5",
@@ -17,6 +17,8 @@
     "ddos": "^0.1.31",
     "debug": "~2.6.9",
     "dotenv": "^8.0.0",
+    "esdoc": "^1.1.0",
+    "esdoc-standard-plugin": "^1.0.0",
     "express": "~4.15.5",
     "express-rate-limit": "^5.0.0",
     "express-session": "^1.15.6",
@@ -45,5 +47,8 @@
   "main": "app.js",
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "jsdoc": "^3.6.3"
+  }
 }

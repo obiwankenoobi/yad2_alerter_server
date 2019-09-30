@@ -62,7 +62,7 @@ const sendEmail = require('./sendEmail')
 /**
  * function to build url for the search
  * @param {SearchConfig} config object with search config
- * @returns {UrlObject} { url}
+ * @returns {UrlObject}
  */
 function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 0, toRooms = 99999}) {
   const neighborhoods = {
