@@ -29,13 +29,16 @@ function redisFactory(redis) {
     } else {
       hashes = JSON.parse(hashes);
     }
-    // console.log('hashes found:')
-    // print(hashes)
+
     return hashes
   }
 
   /**
    * function to set hash of the returned results in redis
+   * @param {String} hash hashed url examp: '2626769505'
+   * @param {String} newHashedResults hash of the new results examp: '6046e67a6986462c2e9377fa8e274981c9d19050'
+   * @param {Number} newSearchesLength length of the results
+   * @param {String} url the url that has used for the search
    */
   async function addSearchResultHashToRedis(hash, newHashedResults, newSearchesLength, url) {
     const hashedSearchResults = await redis.getAsync('hashedSearchResults')
@@ -110,20 +113,24 @@ function redisFactory(redis) {
       readyHashes[hash].emails[email] = true
     }
     await redis.setAsync('hashes', JSON.stringify(readyHashes))
-    console.log('this is hashes:\n')
-    return await redis.getAsync('hashes')
+
+    const saved = await redis.getAsync('hashes')
+    return JSON.parse(saved)
   }
 
   /**
    * a function that injects redis into it to use in its scope
    * @param {Function} fn function to inject redis into
-   * @param {Redis} redis instance of redis
    * @param  {...any} args arguments to pass into the fuunction
    */
   function addRedis(fn, ...args) {
     return fn(redis, ...args)
   }
 
+  /**
+   * getter for redis
+   * @param {String} key key to find in redis
+   */
   async function getValue(key) {
     return await redis.getAsync(key)
   }

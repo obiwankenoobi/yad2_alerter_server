@@ -27,17 +27,17 @@ function createAlert(hashes = {}) {
       links[hash] = url
     }
 
-    console.log('links to update', links)
     const savedAlerts = await User.create({ email, alerts:links })
-    console.log('savedAlerts', savedAlerts)
 
     for(let hash in links) {
+      console.log('updaing alert in redis')
+      console.log(hash, hashes, email, links[hash])
       await updateAlertInRedis(hash, hashes, email, links[hash]) 
     }
 
     return res.status(200).json({ message:'alerts saved' })
   }
-}
+}//
 
 /**
  * return function to add new alert
@@ -50,8 +50,7 @@ function addAlert(req, res, next) {
       return res.status(500).json({error})
     }
     const hashes = await getValue('hashes')
-    const createAlertWithHashes = createAlert(JSON.parse(hashes))
-    if (!user) return createAlertWithHashes(req, res, next)
+    if (!user) return createAlert(JSON.parse(hashes))(req, res, next)
   
     const nextAlerts = {}
     // rotating through the array of alerts 

@@ -1,6 +1,7 @@
 const redisFactory = require('../services/redis/redisFactory')
 const Redis = require('../mocks/redis.mock')
 const { User, Search } = require('../mocks/mongoose.mock')
+const { print } = require('../utils/utils')
 const { 
   getNewLinks,
 } = require('../services/crawler')
@@ -44,5 +45,36 @@ describe('{redisFactory}', () => {
     const users = await getAllUsers(User)
     const hashes = await getHashes(users)
     expect(typeof hashes).toBe('object')
+  })
+  test('{updateAlertInRedis} should add new alert to redis', async () => {
+    const hashes = {
+      "2084409008": {
+        "url": "https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=205&rooms=1-5.5&price=0-3000",
+        "emails": {
+          "artium1@gmail.com": true
+        }
+      },
+      "2626769505": {
+        "url": "https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-3000",
+        "emails": {
+          "artium1@gmail.com": true
+        }
+      },
+      "3488252183": {
+        "url": "https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=205&rooms=1-5.5&price=0-1500",
+        "emails": {
+          "artium1@gmail.com": true
+        }
+      }
+    }
+    const email = 'artium1new@gmail.com'
+    const url = 'https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-3000'
+    const urlHash = '3488252153'
+    const nextHashes = 
+      await updateAlertInRedis(urlHash, hashes, email, url)
+      
+    expect(typeof nextHashes).toBe('object')
+    expect(nextHashes[urlHash]['url']).toBe(url)
+    expect(nextHashes[urlHash]['emails'][email]).toBe(true)
   })
 })

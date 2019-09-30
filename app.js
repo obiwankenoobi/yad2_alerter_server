@@ -65,7 +65,7 @@ app.use('/alerts', alerts)
 
 //main(client)
 main()
-setInterval(main, minToMs(3))
+setInterval(main, minToMs(1))
 
 function minToMs(min) {
   return 1000 * 60 * min
