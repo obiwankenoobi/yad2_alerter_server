@@ -5,6 +5,9 @@ const jwt = require('jsonwebtoken')
 const stringHash = require('string-hash')
 const hashFunc = require('object-hash')
 const _ = require('lodash')
+const { 
+  addNewSearch 
+} = require('./database/mongoFactory')()
 
 const { User } = require('../db/models/UserSchema')
 const { Search } = require('../db/models/SearchesSchema')
@@ -55,21 +58,7 @@ const sendEmail = require('./sendEmail')
   *  }
  * }
  */
-/**
- * return all users from database
- * @returns {Array<User>}
- */
-function getAllUsers(docSchema) {
-  return new Promise((resolve, reject) => {
-    docSchema.find((e, docs) => {
-      if (e) {
-        print(e)
-        return reject(e)
-      }
-      resolve(docs)
-    })
-  })
-}
+
 /**
  * function to build url for the search
  * @param {SearchConfig} config object with search config
@@ -98,71 +87,7 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
 
   return { url, hash }
 }
-/**
- * function to add new search term to db
- * @param {String} url the url to crawl
- * @param {String} hash the hash of url to crawl
- * @returns {Promise}
- */
-function addNewSearch(docSchema) {
-  return function(url, hash) {
-    return new Promise((resolve, reject) => {
-      docSchema.findOne({ hash }, (error, searchObj) => {
-        if (error) return reject({ error })
-        if (!searchObj) {
-          const newSearch = 
-            new docSchema({ hash, url, searches:{ old:[], new:[] } })
-  
-          newSearch.save((error, doc) => {
-            if (error) {
-              print(error)
-              reject(error)
-            }
-            resolve('searches saved')
-          })
-        } else {
-          searchObj.save((error, doc) => {
-            if (error) {
-              print(error)
-              reject(error)
-            }
-            resolve('searches saved')
-          })
-        }
-      })
-    })
-  }
-}
-/**
- * function to add links to db
- * @param {String} hash hash of the url to crawl
- * @param {Array} links array of links to add
- * @param {String} state can be 'old' | 'new' based on the place it called
- */
-function addLinks(hash, links, state) {
-  return new Promise((resolve, reject) => {
-    if (!links.length) return reject()
-    Search.findOne({ hash }, (error, searchObj) => {
-      if (error) {
-        print(error)
-        return reject({error})
-      }
-      if (!searchObj) {
-        return reject('no hash')
-      }
 
-      searchObj.searches[state] = links
-      searchObj.markModified('searches');
-      searchObj.save((error, doc) => {
-        if (error) {
-          print(error)
-          reject(error)
-        }
-        resolve('searches saved')
-      })
-    })
-  })
-}
 /**
  * function to open yad2 and expend the listing
  * @param {Nightmare} instance instance of nightmare
@@ -176,9 +101,9 @@ async function expendFeed(instance, config) {
     await addNewSearchWithSchema(url, hash)
 
     const list = await instance
-    .on('console', (log, msg) => {
-      console.log(msg)
-    })
+    // .on('console', (log, msg) => {
+    //   console.log(msg)
+    // })
     .goto(url)
     .wait('.feed_list')
     .evaluate(async () => {
@@ -249,37 +174,8 @@ async function getLinks(instance) {
 
   return links
 }
-/**
- * function to write links into file
- * @param {Array} links array of links to write
- * @param {String} fileName name of file to write links to
- */
-function writeLinks(links, fileName) {
-  exec(`> ${fileName}`)
-  links.forEach(link => {
-    exec(`echo ${link} >> ${fileName}`)
-  })
-}
-/**
- * function to read links from search term in db
- * @param {String} hash hash of the search to read from
- * @param {String} state can be 'old' | 'new' based on where it's called
- */
-function readLinks(docSchema) {
-  return function(hash, state) {
-    return new Promise((resolve, reject) => {
-      docSchema.findOne({ hash }, (error, searchObj) => {
-        if (error) {
-          return reject({error})
-        }
-        if (!searchObj) {
-          return reject('no user')
-        }
-        resolve(searchObj.searches[state])
-      })
-    })
-  }
-}
+
+
 /**
  * function to compare between two list and return the difference as the new links
  * @param {Array} prevLinks links that already exist in db
@@ -302,180 +198,6 @@ function getNewLinks(prevLinks, currentLinks) {
   })
 
   return Object.keys(newLinks)
-}
-/**
- * function to get search hashes from signed users
- * @param {Redis} redis redis instance
- * @param {Object} users object of users 
- * @returns {HashObject} 
- */
-async function getHashes(redis, users) {
-  let hashes = await redis.getAsync('hashes')
-  if (!hashes) {
-    const hashesTmp = {}
-    for(let user of users) {
-      const email = user.email
-      for(let id in user.alerts) {
-        if (!hashesTmp[id]) {
-          hashesTmp[id] = {
-            url:user.alerts[id],
-            emails:{ [user.email]: true }
-          }
-        } else {
-          hashesTmp[id].emails[user.email] = true
-        }
-      }
-    }
-    await redis.setAsync('hashes', JSON.stringify(hashesTmp))
-    hashes = hashesTmp;
-  } else {
-    hashes = JSON.parse(hashes);
-  }
-  console.log('hashes:')
-  print(hashes)
-  return hashes
-}
-
-/**
- * function to set hash of the returned results in redis
- * @param {Redis} redis instance of redis
- * @param {Object} newSearches new hashed results exmp: { <searcUrlHash>:<resultsHash> }
- */
-async function addSearchResultHashToRedis(redis, hash, newHashedResults, newSearchesLength, url) {
-  const hashedSearchResults = await redis.getAsync('hashedSearchResults')
-  try {
-    if (hashedSearchResults) {
-      const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
-      hashedSearchResultsObj[hash] = {
-        searchedResultHash: newHashedResults,
-        length:newSearchesLength,
-        url
-      }
-      print({ hashedSearchResultsObj })
-      await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))      
-      print(JSON.parse(await redis.getAsync('hashedSearchResults')))
-    } else {
-      const hashedSearchResultsObj = {}
-      hashedSearchResultsObj[hash] = {
-        searchedResultHash: newHashedResults,
-        length:newSearchesLength,
-        url
-      }
-      await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))
-      const hashed = JSON.parse(await redis.getAsync('hashedSearchResults'))
-      print(hashed)
-      return(hashed)
-    }
-  } catch(e) {
-    Promise.reject(new Error(e))
-  }
-}
-
-/**
- * function to return object with hash of results, length of results and the url of results
- * @param {Redis} redis instance of redis
- * @param {String} urlHash url hash by which to find the search hash
- * @returns {HashResultsObject}
- */
-function getSearchResultsHashFromRedis(redis, urlHash) {
-  return new Promise( async (resolve, reject) => {
-    const hashedSearchResults = await redis.getAsync('hashedSearchResults')
-    if (hashedSearchResults) {
-      const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
-      print({ urlHash, hashedSearchResultsObj })
-      console.log('getSearchResultsHashFromRedis returns:\n')
-      print(hashedSearchResultsObj[urlHash])
-      return resolve(hashedSearchResultsObj[urlHash])
-    } else {
-      resolve(null)
-    }
-  })
-}
-
-async function main(redis) {
-  console.log('starting')
-  const users = await getAllUsers(User)
-
-  if (!users.length) return
-
-  const results = {}
-  const hashes = await getHashes(redis, users)
-  console.log('hashes found:\n')
-  print(hashes)
-  for(let hash in hashes) { 
-    const url = urlParser.parse(hashes[hash].url)
-    const nightmare = Nightmare({ show: true, waitTimeout: 10000 })
-    const config = {
-      neighborhood:url.neighborhood,
-      fromPrice:url.price.split('-')[0],
-      toPrice:url.price.split('-')[1],
-      fromRooms:url.rooms.split('-')[0],
-      toRooms:url.rooms.split('-')[1],
-      ignoreAgencies:true
-    }
-
-    try {
-      const searchedUrlHash = await expendFeed(nightmare, config);
-
-      console.log('getting links')
-      // get links from yad2
-      const newLinks = await getLinks(nightmare)
-      const oldHashedResults = await getSearchResultsHashFromRedis(redis, hash)
-      const newHashedResults = hashFunc(newLinks)
-
-      console.log('oldHashedResults:')
-      print(oldHashedResults)
-
-      if (!oldHashedResults) {
-        console.log('!oldHashedResults')
-        print({ hash, searchedUrlHash })
-        await addSearchResultHashToRedis(redis, hash, newHashedResults, newLinks.length, hashes[hash].url)
-      } else {
-        const oldLinksLength = oldHashedResults.length
-
-        // until i will think about better solution
-        // the issue is that sometimes Nightmare wont read 
-        // all links and instead of returning 20 links to db
-        // it will return only 10 and next time it crawl it will 
-        // fake find 10 new links because it will think 
-        // these extra 10 are new
-
-        console.log(`oldLinksLength: ${oldLinksLength}\n newLinks.length: ${newLinks.length}`)
-        
-        if (oldLinksLength > 3 && oldLinksLength - newLinks.length > 3) return
-
-        console.log(`oldLinksLength: ${oldLinksLength}\n newLinks.length: ${newLinks.length}`)
-
-        // if there is no change in results return
-        if (oldHashedResults.searchedResultHash === newHashedResults) return
-
-        // setting hash of thee results for the current search
-        await addSearchResultHashToRedis(redis, hash, newHashedResults, newLinks.length, hashes[hash].url)
-
-        // write links to db//
-        await addLinks(hash, newLinks, 'new')
-
-        // read old links
-        const readLinksWithSchema = readLinks(Search)
-        const oldLinks = await readLinksWithSchema(hash, 'old')
-  
-        // replace old links with the new one's
-        await addLinks(hash, newLinks, 'old')
-  
-        // get new links
-        const foundLinks = getNewLinks(oldLinks, newLinks)
-        
-        results[hash] = { foundLinks, emails:hashes[hash].emails }
-        console.log('results:\n')
-        print(results)
-  
-        // send links to emails
-        sendLinks(results)
-      }
-    } catch(e) {
-      print(e)
-    }
-  }
 }
 
 
@@ -500,15 +222,10 @@ function sendLinks(results) {
 
 
 module.exports = { 
-  main, 
-  readLinks, 
-  writeLinks, 
   getNewLinks, 
-  urlBuilder, 
-  getHashes, 
-  getAllUsers, 
-  addNewSearch,
-  addSearchResultHashToRedis,
-  getSearchResultsHashFromRedis
+  urlBuilder,
+  sendLinks,
+  expendFeed,
+  getLinks
 }
 

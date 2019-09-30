@@ -6,14 +6,12 @@ const cookieParser = require('cookie-parser')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const dotenv = require('dotenv')
-const { client } = require('./db/redisClient')
-const { main } = require('./services/crawler.js')
+const { main } = require('./services/main')
 
 dotenv.config()
 
 // anti ddos
 const RateLimit = require('express-rate-limit')
-const auth = require('./api/auth')
 const alerts = require('./api/alerts')
 
 // passport imports
@@ -63,44 +61,15 @@ app.use(passport.initialize())
 app.use(passport.session())
 app.use(cors())
 
-app.use('/auth', auth)
 app.use('/alerts', alerts)
 
 //main(client)
-setInterval(main, minToMs(1), client)
+main()
+setInterval(main, minToMs(3))
 
 function minToMs(min) {
   return 1000 * 60 * min
 }
-// // passport initialize
-// const { User } = require('./db/models/UserSchema')
-
-
-
-// method for authorize user,
-//it will assume the token is in header under Bearer Auth
-// passport.use(
-//   new JwtStrategy(
-//     {
-//       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-//       secretOrKey: process.env.JWTsecret
-//     },
-//     (jwtPayload, cb) => {
-//       //find the user in db if needed
-//       return User.findOne({
-//         username: jwtPayload.username
-//       })
-//         .then(user => {
-//           return cb(null, user)
-//         })
-//         .catch(err => {
-//           return cb(err)
-//         })
-//     }
-//   )
-// )
-// passport.serializeUser(User.serializeUser())
-// passport.deserializeUser(User.deserializeUser())
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

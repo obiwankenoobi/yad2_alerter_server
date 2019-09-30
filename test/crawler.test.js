@@ -1,17 +1,16 @@
 const { 
-  getAllUsers,
   urlBuilder,
   addNewSearch,
-  readLinks,
   getNewLinks,
-  getHashes,
-  addSearchResultHashToRedis,
-  getSearchResultsHashFromRedis
 } = require('../services/crawler')
-const { User, Search } = require('./mongoose.mock')
+const { 
+  readLinks, 
+  getAllUsers,
+} = require('../services/database/mongoFactory')()
+const { User, Search } = require('../mocks/mongoose.mock')
 const urlParser = require('query-string')
 const randomstring = require("randomstring")
-const Redis = require('./redis.mock')
+const Redis = require('../mocks/redis.mock')
 
 describe('Testing crawler', () => {
   test('{getAllUsers} expect to return an array of users', async () => {
@@ -48,31 +47,5 @@ describe('Testing crawler', () => {
     const currentLinks = [...prevLinks, `https://www.yad2.co.il/s/c/${ randomstring.generate({ length: 6 }) }`]
     const found = getNewLinks(prevLinks, currentLinks)
     expect(found.length).toBe(1)
-  })
-  test('{getHashes} should create and return object with search hashes linked to user emails', async () => {
-    const redis = new Redis()
-    const users = await getAllUsers(User)
-    const hashes = await getHashes(redis, users)
-    expect(typeof hashes).toBe('object')
-  })
-
-  const redis = new Redis()
-  const urlHash = '2626769505'
-  test('{addSearchResultHashToRedis} should add hash of results to redis', async () => {
-    const newHashedResults = '6046e67a6986462c2e9377fa8e274981c9d19050'
-    const newSearchesLength = 25
-    const url = 'https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-3000'
-    const hashed = await addSearchResultHashToRedis(redis, urlHash, newHashedResults, newSearchesLength, url)
-    expect(typeof hashed).toBe('object')
-  })
-  test('{getSearchResultsHashFromRedis} should return object with hash of results, url and length', async () => {
-    const { 
-      searchedResultHash,
-      length,
-      url
-     } = await getSearchResultsHashFromRedis(redis, urlHash)
-    expect(url).toBe('https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-3000')
-    expect(length).toBe(25)
-    expect(searchedResultHash).toBe('6046e67a6986462c2e9377fa8e274981c9d19050')
   })
 })

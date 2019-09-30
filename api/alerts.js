@@ -1,13 +1,10 @@
 const addAlert = require('../services/alerts')
-const { main } = require('../services/crawler')
+const { main } = require('../services/main')
 const express = require("express")
 const router = express.Router()
-const { client, addRedis } = require('../db/redisClient')
 const { sendEmail } = require('../services/sendEmail')
 
-const addAlertsWithRedis = addRedis(addAlert, client)
-
-router.post('/add', addAlertsWithRedis)
+router.post('/add', addAlert)
 router.post('/crawl', main)
 
 module.exports = router
