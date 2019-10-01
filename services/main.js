@@ -19,11 +19,12 @@ const {
 } = require('../services/redis/redisFactoryExport')
 
 const { 
-  sendLinks,
   expendFeed,
   getLinks,
   getNewLinks
  } = require('./crawler')
+
+ const { sendLinks } = reequire('./email')
 
 const { User } = require('../db/models/UserSchema')
 const { Search } = require('../db/models/SearchesSchema')

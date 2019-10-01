@@ -1,5 +1,5 @@
 const { createUrl, print } = require('../../utils/utils')
-const { getAllUsers } = require('../../services/crawler')
+const { getAllUsers } = require('../crawler')
 function redisFactory(redis) {
   /**
    * function to get search hashes from signed users

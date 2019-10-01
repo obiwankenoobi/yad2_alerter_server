@@ -1,19 +1,18 @@
 const jwt = require("jsonwebtoken")
-const { User } = require("../db/models/UserSchema")
+const { User } = require("../../db/models/UserSchema")
 const stringHash = require("string-hash")
-const { createUrl } = require('../utils/utils')
+const { createUrl } = require('../../utils/utils')
 const { 
   getSearchResultsHashFromRedis,
-  addSearchResultHashToRedis,
   getHashes,
   addRedis,
   updateAlertInRedis,
   getValue
-} = require('../services/redis/redisFactoryExport')
-const { getAllUsers } = require('../services/crawler')
+} = require('../redis/redisFactoryExport')
+const { getAllUsers } = require('../crawler')
 
 /**
- * add new alert to redis and to db
+ * creating new alert to redis and to db
  * @param {Object} hashes object of the hashes that already in memory
  * @returns {Function} return function with redis instance in scope
  */
@@ -30,8 +29,6 @@ function createAlert(hashes = {}) {
     const savedAlerts = await User.create({ email, alerts:links })
 
     for(let hash in links) {
-      console.log('updaing alert in redis')
-      console.log(hash, hashes, email, links[hash])
       await updateAlertInRedis(hash, hashes, email, links[hash]) 
     }
 
@@ -40,7 +37,7 @@ function createAlert(hashes = {}) {
 }//
 
 /**
- * return function to add new alert
+ * adding new alert
  */
 function addAlert(req, res, next) {
   const { body: { email, alerts } } = req

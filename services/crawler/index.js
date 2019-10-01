@@ -7,12 +7,12 @@ const hashFunc = require('object-hash')
 const _ = require('lodash')
 const { 
   addNewSearch 
-} = require('./database/mongoFactory')()
+} = require('../database/mongoFactory')()
 
-const { User } = require('../db/models/UserSchema')
-const { Search } = require('../db/models/SearchesSchema')
-const { createUrl, print } = require('../utils/utils')
-const sendEmail = require('./sendEmail')
+const { User } = require('../../db/models/UserSchema')
+const { Search } = require('../../db/models/SearchesSchema')
+const { createUrl, print } = require('../../utils/utils')
+
 
 
 /**
@@ -201,30 +201,12 @@ function getNewLinks(prevLinks, currentLinks) {
 }
 
 
-function sendLinks(results) {
-  for(let hash in results) {
-    for(let email in results[hash].emails) {
-      const linksFound = results[hash].foundLinks
 
-      if (!linksFound.length) return 
-
-      const emailObj = {
-        fromEmail:'dev@inlyne.co',
-        toEmail: email,
-        subject:'hello world', 
-        text: linksFound.map(id => 'https://www.yad2.co.il/item/'.concat(id) + '\n').toString().replace(/,/g, ''),
-        html:''
-      }
-      sendEmail(emailObj).catch(console.error)
-    }
-  }
-} 
 
 
 module.exports = { 
   getNewLinks, 
   urlBuilder,
-  sendLinks,
   expendFeed,
   getLinks
 }
