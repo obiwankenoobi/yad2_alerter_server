@@ -1,4 +1,4 @@
-const { createUrl, print } = require('../../utils/utils')
+const { print } = require('../../utils/utils')
 const { getAllUsers } = require('../crawler')
 
 /**

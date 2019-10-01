@@ -28,7 +28,7 @@ const {
 
 const { User } = require('../db/models/UserSchema')
 const { Search } = require('../db/models/SearchesSchema')
-const { createUrl, print } = require('../utils/utils')
+const { print } = require('../utils/utils')
 const sendEmail = require('./sendEmail')
 
 async function main() {

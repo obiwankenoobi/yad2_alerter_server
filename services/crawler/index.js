@@ -80,9 +80,14 @@ function urlBuilder({neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 
     throw new Error('No such neighborhood')
   }
  
-  const url = 
-    createUrl(neighborhood, fromPrice, toPrice, fromRooms, toRooms)
-  
+  const urlParams = {
+    neighborhood,
+    fromPrice,
+    toPrice,
+    fromRooms,
+    toRooms
+  }
+  const url = createUrl(urlParams)
   const hash = stringHash(url).toString()
 
   return { url, hash }

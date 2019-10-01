@@ -21,7 +21,14 @@ function createAlert(hashes = {}) {
     const { body: { email, alerts } } = req
     const links = {}
     for(let alert of alerts) {
-      const url = createUrl(alert.neighborhood.value, alert.fromPrice.value, alert.toPrice.value, alert.fromRooms.value, alert.toRooms.value)
+      const urlParams = {
+        neighborhood: alert.neighborhood.value,
+        fromPrice: alert.fromPrice.value,
+        toPrice: alert.toPrice.value,
+        fromRooms: alert.fromRooms.value,
+        toRooms: alert.toRooms.value
+      }
+      const url = createUrl(urlParams)
       const hash = stringHash(url)
       links[hash] = url
     }
@@ -61,7 +68,14 @@ function addAlert(req, res, next) {
     // each object as prop of { nextAlerts } with its 'id' 
     // as key
     for(let alert of alerts) {
-      const url = createUrl(alert.neighborhood.value, alert.fromPrice.value, alert.toPrice.value, alert.fromRooms.value, alert.toRooms.value)
+      const urlParams = {
+        neighborhood: alert.neighborhood.value,
+        fromPrice: alert.fromPrice.value,
+        toPrice: alert.toPrice.value,
+        fromRooms: alert.fromRooms.value,
+        toRooms: alert.toRooms.value
+      }
+      const url = createUrl(urlParams)
       const hash = stringHash(url)
       nextAlerts[hash] = url
       const alertObj = {
