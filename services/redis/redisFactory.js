@@ -1,5 +1,5 @@
 const { print } = require('../../utils/utils')
-const { getAllUsers } = require('../crawler')
+const { getAllUsers } = require('../database/mongoFactory')
 
 /**
 * Object to save in redis with information about the current search

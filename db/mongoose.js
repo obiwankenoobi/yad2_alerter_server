@@ -6,12 +6,7 @@ let mongoose = require("mongoose");
 let attempts = 0
 if (process.env.MONGO_DB_ADDRESS) {
   mongoose
-    .connect(process.env.MONGO_DB_ADDRESS, {
-      auth: {
-        user: process.env.MONGOֹ_USERNAME,
-        password: process.env.MONGOֹֹֹ_PASSWORD
-      }
-    })
+    .connect(process.env.MONGO_DB_ADDRESS, { useNewUrlParser: true })
     .then(() => console.log("connection successful"))
     .catch(err => console.error(err));
 } else {

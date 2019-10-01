@@ -33,14 +33,16 @@ const { print } = require('../utils/utils')
 
 async function main() {
   console.log('starting')
+  clearCrawler()
   const users = await getAllUsers(User)
-
+  console.log('users.length: ', users.length)
   if (!users.length) return
 
   const results = {}
   const hashes = await getHashes(users)
 
   for(let hash in hashes) { 
+    clearCrawler()
     const url = urlParser.parse(hashes[hash].url)
 
     const config = {
@@ -82,13 +84,11 @@ async function main() {
         // these extra 10 are new
         console.log(`oldLinksLength: ${oldLinksLength}\nnewLinks.length: ${newLinks.length}`)
         if (oldLinksLength > 3 && oldLinksLength - newLinks.length > 3) {
-          clearCrawler()
           continue
         }
         
         // if there is no change in results return
         if (oldHashedResults.searchedResultHash === newHashedResults) {
-          clearCrawler()
           continue
         }
 
@@ -116,10 +116,8 @@ async function main() {
         sendLinks(results)
       }
     } catch(e) {
-      clearCrawler()
       console.log(e)
     }
-    clearCrawler()
   }
 }
 
