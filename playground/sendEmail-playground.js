@@ -1,4 +1,4 @@
-const sendEmail = require('../services/sendEmail')
+const { sendEmail } = require('../services/email')
 
 const emailObj = {
   fromEmail:'dev@inlyne.co',

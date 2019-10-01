@@ -6,7 +6,7 @@ const {
 const { 
   readLinks, 
   getAllUsers,
-} = require('../services/database/mongoFactory')()
+} = require('../services/database/mongoFactory')
 const { User, Search } = require('../mocks/mongoose.mock')
 const urlParser = require('query-string')
 const randomstring = require("randomstring")

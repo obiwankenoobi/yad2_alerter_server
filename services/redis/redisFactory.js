@@ -9,7 +9,6 @@ const { getAllUsers } = require('../crawler')
 * @property {Number} newSearchesLength length of the results
 * @property {String} url the url that has used for the search
 */
-
 /**
  * Alert object to save in redis
  * @typedef {Object} AlertObj
@@ -18,16 +17,44 @@ const { getAllUsers } = require('../crawler')
  * @property {String} email email of user
  * @property {String} url url of the search 
  */
+/**
+ * @typedef {Object} HashObject
+ * @example
+ * {
+ *  "2626769505": {
+ *    "url": "https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-3000",
+ *    "emails": {
+ *      "artium1@gmail.com": true
+ *    }
+ *  },
+ *  "2626769504": {
+ *    "url": "https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-2000",
+ *    "emails": {
+ *      "a@b.c": true
+ *    }
+ *  }
+ * }
+ */
+/**
+ * @typedef {Object} HashResultsObject
+ * @property {String} url the url which hash linked to
+ * @property {String} searchedResultHash the hash of search results
+ * @property {Numbere} length the length of results
+ */
 
-function redisFactory(redis) {
+class RedisFactory {
+
+  constructor(redis) {
+    this.redis = redis
+  }
   /**
    * function to get search hashes from signed users
    * @param {Redis} redis redis instance
    * @param {Object} users object of users 
    * @returns {HashObject} 
    */
-  async function getHashes(users) {
-    let hashes = await redis.getAsync('hashes')
+  async getHashes(users) {
+    let hashes = await this.redis.getAsync('hashes')
     if (!hashes) {
       const hashesTmp = {}
       for(let user of users) {
@@ -43,7 +70,7 @@ function redisFactory(redis) {
           }
         }
       }
-      await redis.setAsync('hashes', JSON.stringify(hashesTmp))
+      await this.redis.setAsync('hashes', JSON.stringify(hashesTmp))
       hashes = hashesTmp;
     } else {
       hashes = JSON.parse(hashes);
@@ -56,8 +83,8 @@ function redisFactory(redis) {
    * function to set hash of the returned results in redis
    * @param {SearchResultHashObj} 
    */
-  async function addSearchResultHashToRedis({ hash, newHashedResults, newSearchesLength, url }) {
-    const hashedSearchResults = await redis.getAsync('hashedSearchResults')
+  async addSearchResultHashToRedis({ hash, newHashedResults, newSearchesLength, url }) {
+    const hashedSearchResults = await this.redis.getAsync('hashedSearchResults')
     try {
       if (hashedSearchResults) {
         const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
@@ -66,9 +93,9 @@ function redisFactory(redis) {
           length:newSearchesLength,
           url
         }
-        //print({ hashedSearchResultsObj })
-        await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))      
-        //print(JSON.parse(await redis.getAsync('hashedSearchResults')))
+        
+        await this.redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))      
+        
       } else {
         const hashedSearchResultsObj = {}
         hashedSearchResultsObj[hash] = {
@@ -76,8 +103,8 @@ function redisFactory(redis) {
           length:newSearchesLength,
           url
         }
-        await redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))
-        const hashed = JSON.parse(await redis.getAsync('hashedSearchResults'))
+        await this.redis.setAsync('hashedSearchResults', JSON.stringify(hashedSearchResultsObj))
+        const hashed = JSON.parse(await this.redis.getAsync('hashedSearchResults'))
         //print(hashed)
         return(hashed)
       }
@@ -91,9 +118,9 @@ function redisFactory(redis) {
    * @param {String} urlHash url hash by which to find the search hash
    * @returns {HashResultsObject}
    */
-  function getSearchResultsHashFromRedis(urlHash) {
+  getSearchResultsHashFromRedis(urlHash) {
     return new Promise( async (resolve, reject) => {
-      const hashedSearchResults = await redis.getAsync('hashedSearchResults')
+      const hashedSearchResults = await this.redis.getAsync('hashedSearchResults')
       if (hashedSearchResults) {
         const hashedSearchResultsObj = JSON.parse(hashedSearchResults)
         return resolve(hashedSearchResultsObj[urlHash])
@@ -107,7 +134,7 @@ function redisFactory(redis) {
    * update alert in redis
    * @param {AlertObj}
    */
-  async function updateAlertInRedis({ hash, hashes, email, url }) {
+  async updateAlertInRedis({ hash, hashes, email, url }) {
     let readyHashes = typeof hashes !== 'object' ? JSON.parse(hashes) : hashes
     if (!readyHashes) {
       const users = await getAllUsers()
@@ -123,9 +150,9 @@ function redisFactory(redis) {
       readyHashes[hash].emails = {}
       readyHashes[hash].emails[email] = true
     }
-    await redis.setAsync('hashes', JSON.stringify(readyHashes))
+    await this.redis.setAsync('hashes', JSON.stringify(readyHashes))
 
-    const saved = await redis.getAsync('hashes')
+    const saved = await this.redis.getAsync('hashes')
     return JSON.parse(saved)
   }
 
@@ -134,26 +161,17 @@ function redisFactory(redis) {
    * @param {Function} fn function to inject redis into
    * @param  {...any} args arguments to pass into the fuunction
    */
-  function addRedis(fn, ...args) {
-    return fn(redis, ...args)
+  addRedis(fn, ...args) {
+    return fn(this.redis, ...args)
   }
 
   /**
    * getter for redis
    * @param {String} key key to find in redis
    */
-  async function getValue(key) {
-    return await redis.getAsync(key)
-  }
-
-  return {
-    getSearchResultsHashFromRedis,
-    addSearchResultHashToRedis,
-    getHashes,
-    addRedis,
-    updateAlertInRedis,
-    getValue
+  async getValue(key) {
+    return await this.redis.getAsync(key)
   }
 }
 
-module.exports = redisFactory
+module.exports = RedisFactory

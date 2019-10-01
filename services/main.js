@@ -10,7 +10,7 @@ const {
   addLinks,
   readLinks,
   getAllUsers,
- } = require('./database/mongoFactory')()
+ } = require('./database/mongoFactory')
 
 const { 
   getSearchResultsHashFromRedis,
@@ -21,15 +21,15 @@ const {
 const { 
   expendFeed,
   getLinks,
-  getNewLinks
+  getNewLinks,
+  clearCrawler
  } = require('./crawler')
 
- const { sendLinks } = reequire('./email')
+ const { sendLinks } = require('./email')
 
 const { User } = require('../db/models/UserSchema')
 const { Search } = require('../db/models/SearchesSchema')
 const { print } = require('../utils/utils')
-const sendEmail = require('./sendEmail')
 
 async function main() {
   console.log('starting')
@@ -42,7 +42,7 @@ async function main() {
 
   for(let hash in hashes) { 
     const url = urlParser.parse(hashes[hash].url)
-    const nightmare = Nightmare({ show: false, waitTimeout: 10000 })
+
     const config = {
       neighborhood:url.neighborhood,
       fromPrice:url.price.split('-')[0],
@@ -54,16 +54,15 @@ async function main() {
 
     try {
       // expending feed to get access to links
-      const searchedUrlHash = await expendFeed(nightmare, config);    
+      const searchedUrlHash = await expendFeed(config);    
 
       // get links from yad2
-      const newLinks = await getLinks(nightmare)
+      const newLinks = await getLinks()
+      
       const oldHashedResults = await getSearchResultsHashFromRedis(hash)
+      
       const newHashedResults = hashFunc(newLinks)
-
-      // console.log('oldHashedResults:')
-      // print(oldHashedResults)
-
+      
       const searchResultHashObj = {
         hash,
         newHashedResults,
@@ -71,8 +70,6 @@ async function main() {
         url: hashes[hash].url
       }
       if (!oldHashedResults) {
-        // console.log('!oldHashedResults')
-        // print({ hash, searchedUrlHash })
         await addSearchResultHashToRedis(searchResultHashObj)
       } else {
         const oldLinksLength = oldHashedResults.length
@@ -83,11 +80,17 @@ async function main() {
         // it will return only 10 and next time it crawl it will 
         // fake find 10 new links because it will think 
         // these extra 10 are new
-        console.log(`oldLinksLength: ${oldLinksLength}\n newLinks.length: ${newLinks.length}`)
-        if (oldLinksLength > 3 && oldLinksLength - newLinks.length > 3) continue
+        console.log(`oldLinksLength: ${oldLinksLength}\nnewLinks.length: ${newLinks.length}`)
+        if (oldLinksLength > 3 && oldLinksLength - newLinks.length > 3) {
+          clearCrawler()
+          continue
+        }
         
         // if there is no change in results return
-        if (oldHashedResults.searchedResultHash === newHashedResults) continue
+        if (oldHashedResults.searchedResultHash === newHashedResults) {
+          clearCrawler()
+          continue
+        }
 
         // setting hash of the results for the current search
         await addSearchResultHashToRedis(searchResultHashObj)
@@ -113,9 +116,10 @@ async function main() {
         sendLinks(results)
       }
     } catch(e) {
+      clearCrawler()
       console.log(e)
-      print(e)
     }
+    clearCrawler()
   }
 }
 

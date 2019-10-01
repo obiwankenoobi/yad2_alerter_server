@@ -1,12 +1,17 @@
 const { User } = require('../../db/models/UserSchema')
 const { Search } = require('../../db/models/SearchesSchema')
 
-function mongoFactory() {
+/**
+ * @typedef User
+ * @property {String} email 
+ * @property {Object} alerts
+ */
+class MongoFactory {
   /**
    * return all users from database
    * @returns {Array<User>}
    */
-  function getAllUsers(docSchema) {
+  getAllUsers(docSchema) {
     return new Promise((resolve, reject) => {
       docSchema.find((e, docs) => {
         if (e) {
@@ -24,7 +29,7 @@ function mongoFactory() {
    * @param {String} hash the hash of url to crawl
    * @returns {Promise}
    */
-  function addNewSearch(docSchema) {
+  addNewSearch(docSchema) {
     return function(url, hash) {
       return new Promise((resolve, reject) => {
         docSchema.findOne({ hash }, (error, searchObj) => {
@@ -60,7 +65,7 @@ function mongoFactory() {
    * @param {Array} links array of links to add
    * @param {String} state can be 'old' | 'new' based on the place it called
    */
-  function addLinks(hash, links, state) {
+  addLinks(hash, links, state) {
     return new Promise((resolve, reject) => {
       if (!links.length) return reject()
       Search.findOne({ hash }, (error, searchObj) => {
@@ -90,7 +95,7 @@ function mongoFactory() {
    * @param {String} hash hash of the search to read from
    * @param {String} state can be 'old' | 'new' based on where it's called
    */
-  function readLinks(docSchema) {
+  readLinks(docSchema) {
     return function(hash, state) {
       return new Promise((resolve, reject) => {
         docSchema.findOne({ hash }, (error, searchObj) => {
@@ -105,14 +110,13 @@ function mongoFactory() {
       })
     }
   }
-
-  return {
-    getAllUsers,
-    addNewSearch,
-    addLinks,
-    readLinks
-  }
 }
 
+const mongoFactory = new MongoFactory()
 
-module.exports = mongoFactory
+module.exports = {
+  getAllUsers:mongoFactory.getAllUsers.bind(mongoFactory),
+  addNewSearch:mongoFactory.addNewSearch.bind(mongoFactory),
+  addLinks:mongoFactory.addLinks.bind(mongoFactory),
+  readLinks:mongoFactory.readLinks.bind(mongoFactory)
+}
