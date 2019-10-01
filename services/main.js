@@ -64,10 +64,16 @@ async function main() {
       // console.log('oldHashedResults:')
       // print(oldHashedResults)
 
+      const searchResultHashObj = {
+        hash,
+        newHashedResults,
+        newSearchesLength: newLinks.length,
+        url: hashes[hash].url
+      }
       if (!oldHashedResults) {
         // console.log('!oldHashedResults')
         // print({ hash, searchedUrlHash })
-        await addSearchResultHashToRedis(hash, newHashedResults, newLinks.length, hashes[hash].url)
+        await addSearchResultHashToRedis(searchResultHashObj)
       } else {
         const oldLinksLength = oldHashedResults.length
 
@@ -84,7 +90,7 @@ async function main() {
         if (oldHashedResults.searchedResultHash === newHashedResults) continue
 
         // setting hash of the results for the current search
-        await addSearchResultHashToRedis(hash, newHashedResults, newLinks.length, hashes[hash].url)
+        await addSearchResultHashToRedis(searchResultHashObj)
 
         // write links to db
         await addLinks(hash, newLinks, 'new')

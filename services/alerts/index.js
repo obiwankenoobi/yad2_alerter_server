@@ -29,7 +29,13 @@ function createAlert(hashes = {}) {
     const savedAlerts = await User.create({ email, alerts:links })
 
     for(let hash in links) {
-      await updateAlertInRedis(hash, hashes, email, links[hash]) 
+      const alertObj = {
+        hash,
+        hashes,
+        email,
+        url: links[hash]
+      }
+      await updateAlertInRedis(alertObj) 
     }
 
     return res.status(200).json({ message:'alerts saved' })
@@ -58,7 +64,13 @@ function addAlert(req, res, next) {
       const url = createUrl(alert.neighborhood.value, alert.fromPrice.value, alert.toPrice.value, alert.fromRooms.value, alert.toRooms.value)
       const hash = stringHash(url)
       nextAlerts[hash] = url
-      await updateAlertInRedis(hash, hashes, email, url)
+      const alertObj = {
+        hash,
+        hashes,
+        email,
+        url
+      }
+      await updateAlertInRedis(alertObj)
     }
 
     // rotating through the alerts object returned

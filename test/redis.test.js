@@ -22,12 +22,19 @@ describe('{redisFactory}', () => {
     expect(typeof getHashes).toBe('function')
   })
 
+
   const urlHash = '2626769505'
   test('{addSearchResultHashToRedis} should add hash of results to redis', async () => {
     const newHashedResults = '6046e67a6986462c2e9377fa8e274981c9d19050'
     const newSearchesLength = 25
     const url = 'https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-3000'
-    const hashed = await addSearchResultHashToRedis(urlHash, newHashedResults, newSearchesLength, url)
+    const searchResultHashObj = {
+      hash: urlHash,
+      newHashedResults,
+      newSearchesLength,
+      url
+    }
+    const hashed = await addSearchResultHashToRedis(searchResultHashObj)
     expect(typeof hashed).toBe('object')
   })
   test('{getSearchResultsHashFromRedis} should return object with hash of results, url and length', async () => {
@@ -70,8 +77,14 @@ describe('{redisFactory}', () => {
     const email = 'artium1new@gmail.com'
     const url = 'https://www.yad2.co.il/realestate/rent?city=5000&neighborhood=1520&rooms=1-5.5&price=0-3000'
     const urlHash = '3488252153'
+    const alertObj = {
+      hash: urlHash,
+      hashes,
+      email,
+      url
+    }
     const nextHashes = 
-      await updateAlertInRedis(urlHash, hashes, email, url)
+      await updateAlertInRedis(alertObj)
       
     expect(typeof nextHashes).toBe('object')
     expect(nextHashes[urlHash]['url']).toBe(url)

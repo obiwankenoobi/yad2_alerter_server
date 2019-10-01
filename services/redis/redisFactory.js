@@ -1,5 +1,24 @@
 const { createUrl, print } = require('../../utils/utils')
 const { getAllUsers } = require('../crawler')
+
+/**
+* Object to save in redis with information about the current search
+* @typedef {Object} SearchResultHashObj
+* @property {String} hash hashed url examp: '2626769505'
+* @property {String} newHashedResults hash of the new results examp: '6046e67a6986462c2e9377fa8e274981c9d19050'
+* @property {Number} newSearchesLength length of the results
+* @property {String} url the url that has used for the search
+*/
+
+/**
+ * Alert object to save in redis
+ * @typedef {Object} AlertObj
+ * @property {String} hash hash of the searhing url
+ * @property {Object} hashes object of the hashes that already in memory
+ * @property {String} email email of user
+ * @property {String} url url of the search 
+ */
+
 function redisFactory(redis) {
   /**
    * function to get search hashes from signed users
@@ -35,12 +54,9 @@ function redisFactory(redis) {
 
   /**
    * function to set hash of the returned results in redis
-   * @param {String} hash hashed url examp: '2626769505'
-   * @param {String} newHashedResults hash of the new results examp: '6046e67a6986462c2e9377fa8e274981c9d19050'
-   * @param {Number} newSearchesLength length of the results
-   * @param {String} url the url that has used for the search
+   * @param {SearchResultHashObj} 
    */
-  async function addSearchResultHashToRedis(hash, newHashedResults, newSearchesLength, url) {
+  async function addSearchResultHashToRedis({ hash, newHashedResults, newSearchesLength, url }) {
     const hashedSearchResults = await redis.getAsync('hashedSearchResults')
     try {
       if (hashedSearchResults) {
@@ -72,7 +88,6 @@ function redisFactory(redis) {
 
   /**
    * function to return object with hash of results, length of results and the url of results
-   * @param {Redis} redis instance of redis
    * @param {String} urlHash url hash by which to find the search hash
    * @returns {HashResultsObject}
    */
@@ -90,13 +105,9 @@ function redisFactory(redis) {
 
   /**
    * update alert in redis
-   * @param {Redis} redis instance of redis
-   * @param {String} hash hash of the searhing url
-   * @param {Object} hashes object of the hashes that already in memory
-   * @param {String} email email of user
-   * @param {String} url url of the search 
+   * @param {AlertObj}
    */
-  async function updateAlertInRedis(hash, hashes, email, url) {
+  async function updateAlertInRedis({ hash, hashes, email, url }) {
     let readyHashes = typeof hashes !== 'object' ? JSON.parse(hashes) : hashes
     if (!readyHashes) {
       const users = await getAllUsers()
