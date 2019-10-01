@@ -13,7 +13,15 @@ const { User } = require('../../db/models/UserSchema')
 const { Search } = require('../../db/models/SearchesSchema')
 const { createUrl, print } = require('../../utils/utils')
 
+const timeout = 15000
+const toShow = false
 
+/**
+ * init new instance on Nightmare
+ */
+function initNightmare() {
+  return Nightmare({ show: toShow, waitTimeout: timeout })
+}
 
 /**
  * @typedef {Object} UrlObject
@@ -41,7 +49,14 @@ const { createUrl, print } = require('../../utils/utils')
    * @param {SearchConfig} config object with search config
    * @returns {UrlObject}
    */
-  urlBuilder({ neighborhood, fromPrice = 0, toPrice = 999999, fromRooms = 0, toRooms = 99999 }) {
+  urlBuilder({ 
+    neighborhood, 
+    fromPrice = 0, 
+    toPrice = 999999, 
+    fromRooms = 0, 
+    toRooms = 99999
+   }) {
+
     const neighborhoods = {
       florentine:'205',
       north_old_north:'1483',
@@ -72,7 +87,6 @@ const { createUrl, print } = require('../../utils/utils')
 
   /**
   * function to open yad2 and expend the listing
-  * @param {Nightmare} instance instance of nightmare
   * @param {SearchConfig} config search config
   */
   async expendFeed(config) {
@@ -120,43 +134,50 @@ const { createUrl, print } = require('../../utils/utils')
           }
         }
       })
+
       return hash
     } catch(e) {
       console.log(e)
+      this.instance.end()
       return null
     }
   }
 
   /**
    * function to get links of listing from yad2
-   * @param {Nightmare} instance instance of nightmare
    */
   async getLinks() {
-    const isOpened = '.feeditem .accordion_opened'
-    const links = await this.instance
-    .wait(isOpened)
-    .evaluate(async() => {
-      async function wait(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms))
-      }
 
-      await wait(1000)
+    try {
+      const isOpened = '.feeditem .accordion_opened'
+      const links = await this.instance
+      .wait(isOpened)
+      .evaluate(async() => {
+        async function wait(ms) {
+          return new Promise(resolve => setTimeout(resolve, ms))
+        }
+  
+        await wait(1000)
+  
+        const feedQuery = '.feed_list'
+        const linkQuery = '.feeditem .feed_item .accordion_wide .wrapper .footer li>a .copy_link_placeholder'
+        const children = document.querySelector(feedQuery).children
+        const arr = []
+  
+        for(let i = 0; i < children.length; i++) {
+          const el = children[i].querySelector(linkQuery)
+          if (el) arr.push(el.textContent.split('s/c/')[1])
+        }
+        
+        return arr
 
-      const feedQuery = '.feed_list'
-      const linkQuery = '.feeditem .feed_item .accordion_wide .wrapper .footer li>a .copy_link_placeholder'
-      const children = document.querySelector(feedQuery).children
-      const arr = []
-
-      for(let i = 0; i < children.length; i++) {
-        const el = children[i].querySelector(linkQuery)
-        if (el) arr.push(el.textContent.split('s/c/')[1])
-      }
-      
-      return arr
-    })
-    .end()
-
-    return links
+      }).end()
+  
+      return links
+    } catch(e) {
+      console.log(e)
+      this.instance.end()
+    }
   }
   /**
    * function to compare between two list and return the difference as the new links
@@ -183,12 +204,12 @@ const { createUrl, print } = require('../../utils/utils')
   }
 
   clear() {
-    this.instance = Nightmare({ show: false, waitTimeout: 10000 })
+    this.instance = initNightmare()
   }
  }
 
 
-const nightmare = Nightmare({ show: false, waitTimeout: 10000 })
+const nightmare = initNightmare()
 
 const crawler = new Crawler(nightmare)
 

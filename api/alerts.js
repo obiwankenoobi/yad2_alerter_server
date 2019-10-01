@@ -1,4 +1,4 @@
-const addAlert = require('../services/alerts')
+const { addAlert } = require('../services/alerts')
 const { main } = require('../services/main')
 const express = require("express")
 const router = express.Router()

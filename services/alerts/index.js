@@ -11,6 +11,18 @@ const {
 } = require('../redis/redisFactoryExport')
 const { getAllUsers } = require('../crawler')
 
+
+function errorCheckHandler(alert) {
+  const errors = []
+  if (parseInt(alert.fromPrice.value) > parseInt(alert.toPrice.value)) {
+    errors.push('PRICE_ERROR')
+  } 
+  if (parseInt(alert.fromRooms.value) > parseInt(alert.toRooms.value)) {
+    errors.push('ROOM_ERROR')
+  }
+  return errors.length ? errors : null
+}
+
 /**
  * creating new alert to redis and to db
  * @param {Object} hashes object of the hashes that already in memory
@@ -20,7 +32,9 @@ function createAlert(hashes = {}) {
   return async function(req, res, next) {
     const { body: { email, alerts } } = req
     const links = {}
+    const errors = []
     for(let alert of alerts) {
+
       const urlParams = {
         neighborhood: alert.neighborhood.value,
         fromPrice: alert.fromPrice.value,
@@ -30,7 +44,13 @@ function createAlert(hashes = {}) {
       }
       const url = createUrl(urlParams)
       const hash = stringHash(url)
-      links[hash] = url
+      const error = errorCheckHandler(alert)
+
+      if (error) {
+        errors.push({ hash, errors:[...error] })
+      } else {
+        links[hash] = url
+      }
     }
 
     const savedAlerts = await User.create({ email, alerts:links })
@@ -45,7 +65,10 @@ function createAlert(hashes = {}) {
       await updateAlertInRedis(alertObj) 
     }
 
-    return res.status(200).json({ message:'alerts saved' })
+    return res.status(200).json({
+      message: 'alerts saved',
+      errors, 
+    })
   }
 }//
 
@@ -63,6 +86,7 @@ function addAlert(req, res, next) {
     if (!user) return createAlert(JSON.parse(hashes))(req, res, next)
   
     const nextAlerts = {}
+    const errors = []
     // rotating through the array of alerts 
     // from the req object and assigning
     // each object as prop of { nextAlerts } with its 'id' 
@@ -84,7 +108,13 @@ function addAlert(req, res, next) {
         email,
         url
       }
-      await updateAlertInRedis(alertObj)
+      const error = errorCheckHandler(alert)
+
+      if (error) {
+        errors.push({ hash, errors:[...error] })
+      } else {
+        await updateAlertInRedis(alertObj)
+      }
     }
 
     // rotating through the alerts object returned
@@ -105,10 +135,13 @@ function addAlert(req, res, next) {
         console.log(error)
         return res.status(500).json({error})
       }
-      return res.status(200).json({message:'alerts saved'})
+      return res.status(200).json({
+        message: 'alerts saved',
+        errors, 
+      })
     })
   })
 }
 
 
-module.exports = addAlert
+module.exports = { addAlert, errorCheckHandler }

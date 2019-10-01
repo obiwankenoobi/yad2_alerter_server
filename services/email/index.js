@@ -81,9 +81,9 @@ function sendLinks(results) {
       if (!linksFound.length) return 
 
       const emailObj = {
-        fromEmail:'dev@inlyne.co',
+        fromEmail:'yad2alerter@artyum.co',
         toEmail: email,
-        subject:'hello world', 
+        subject:'new apartments found!', 
         text: linksFound.map(id => 'https://www.yad2.co.il/item/'.concat(id) + '\n').toString().replace(/,/g, ''),
         html:''
       }
