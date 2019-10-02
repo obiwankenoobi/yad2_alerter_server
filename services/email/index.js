@@ -78,7 +78,7 @@ function sendLinks(results) {
     for(let email in results[hash].emails) {
       const linksFound = results[hash].foundLinks
 
-      if (!linksFound.length) return 
+      if (!linksFound.length) continue 
 
       const emailObj = {
         fromEmail:'yad2alerter@artyum.co',

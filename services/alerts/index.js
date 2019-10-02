@@ -129,7 +129,7 @@ function addAlert(req, res, next) {
 
     // combining old alerts with new alerts
     user.alerts = {...nextAlerts, ...user.alerts}
-    
+    user.markModified('alerts');
     user.save((error, doc) => {
       if (error) {
         console.log(error)
