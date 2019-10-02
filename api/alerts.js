@@ -1,5 +1,5 @@
-const { addAlert } = require('../services/alerts')
-const { main } = require('../services/main')
+const { addAlert } = require('../models/alerts')
+const { main } = require('../models/main')
 const express = require("express")
 const router = express.Router()
 

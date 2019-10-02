@@ -87,7 +87,9 @@ function sendLinks(results) {
         text: linksFound.map(id => 'https://www.yad2.co.il/item/'.concat(id) + '\n').toString().replace(/,/g, ''),
         html:''
       }
-      sendEmail(emailObj).catch(console.error)
+      sendEmail(emailObj)
+      .then(res => console.log({ senTto:email, res }))
+      .catch(console.error)
     }
   }
 } 

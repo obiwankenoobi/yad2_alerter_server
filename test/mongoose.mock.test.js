@@ -1,4 +1,4 @@
-const { getAllUsers } = require('../services/crawler')
+const { getAllUsers } = require('../models/crawler')
 const { User, Search } = require('../mocks/mongoose.mock')
 
 describe('Testing mock mongoose', () => {

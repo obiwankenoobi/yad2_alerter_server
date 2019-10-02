@@ -2,7 +2,7 @@ const {
   urlBuilder,
   addNewSearch,
   getNewLinks,
-} = require('../services/crawler')
+} = require('../models/crawler')
 const urlParser = require('query-string')
 const randomstring = require("randomstring")
 const Redis = require('../mocks/redis.mock')

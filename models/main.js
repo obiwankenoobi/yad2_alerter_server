@@ -16,7 +16,7 @@ const {
   getSearchResultsHashFromRedis,
   addSearchResultHashToRedis,
   getHashes
-} = require('../services/redis/redisFactoryExport')
+} = require('../models/redis/redisFactoryExport')
 
 const { 
   expendFeed,
@@ -56,8 +56,10 @@ async function main() {
 
     try {
       // expending feed to get access to links
-      const searchedUrlHash = await expendFeed(config);    
+      const isResults = await expendFeed(config);    
 
+      if (!isResults) continue
+      
       // get links from yad2
       const newLinks = await getLinks()
       

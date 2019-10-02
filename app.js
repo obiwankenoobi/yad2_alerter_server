@@ -6,7 +6,7 @@ const cookieParser = require('cookie-parser')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const dotenv = require('dotenv')
-const { main } = require('./services/main')
+const { main } = require('./models/main')
 
 dotenv.config()
 

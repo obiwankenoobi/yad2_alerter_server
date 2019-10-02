@@ -90,56 +90,64 @@ function initNightmare() {
   * @param {SearchConfig} config search config
   */
   async expendFeed(config) {
+    const { url, hash } = this.urlBuilder(config)
+    let isResults;
     try {
-      const { url, hash } = this.urlBuilder(config)
 
       await addNewSearch(Search)(url, hash)
   
-      const list = await this.instance
-      // .on('console', (log, msg) => {
-      //   console.log(msg)
-      // })
+      isResults = await this.instance
       .goto(url)
-      .wait('.feed_list')
-      .evaluate(async () => {
-    
-        const clickableItemQuery = '.feeditem .feed_item div'
-        const adFinderQuery = '.feeditem .platinum'
-        const agencyFinderQuery = '.feeditem .agency'
-        const children = document.querySelector('.feed_list').children
-        const textNodes = []
-        
-        for(let i = 0; i < children.length; i++) {
+      .exists('.no_results')
+      .then(res => {
+        if (res) {
+          this.instance.end()
+          return false
+        } else {
+          this.instance
+            .goto(url)
+            .wait('.feed_list')
+            .evaluate(async () => {
           
-          // ignoring sponsored links
-          if (children[i].querySelector(adFinderQuery)) {
-            console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
-            console.log('@@@@@@@@@@@@@ ad alert @@@@@@@@@@@@@')
-            console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
-            continue;
-          } 
-          
-          // if (config.ignoreAgencies) {
-          //   if (children[i].querySelector(agencyFinderQuery)) {
-          //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
-          //     console.log('@@@@@@@@@@@ agency alert @@@@@@@@@@@')
-          //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
-          //     continue;
-          //   }
-          // } 
-          
-          else {
-            const el = children[i].querySelector(clickableItemQuery)
-            if (el) await el.click()
-          }
+              const clickableItemQuery = '.feeditem .feed_item div'
+              const adFinderQuery = '.feeditem .platinum'
+              const agencyFinderQuery = '.feeditem .agency'
+              const children = document.querySelector('.feed_list').children
+              const textNodes = []
+              
+              for(let i = 0; i < children.length; i++) {
+                
+                // ignoring sponsored links
+                if (children[i].querySelector(adFinderQuery)) {
+                  console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+                  console.log('@@@@@@@@@@@@@ ad alert @@@@@@@@@@@@@')
+                  console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+                  continue;
+                } 
+                
+                // if (config.ignoreAgencies) {
+                //   if (children[i].querySelector(agencyFinderQuery)) {
+                //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+                //     console.log('@@@@@@@@@@@ agency alert @@@@@@@@@@@')
+                //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+                //     continue;
+                //   }
+                // } 
+                
+                else {
+                  const el = children[i].querySelector(clickableItemQuery)
+                  if (el) await el.click()
+                }
+              }
+            })
+          return true
         }
       })
-
-      return hash
+      return isResults
     } catch(e) {
-      console.log(e)
+      console.log({ error: e, url })
       this.instance.end()
-      return null
+      return false
     }
   }
 

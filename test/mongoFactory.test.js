@@ -1,7 +1,7 @@
 const { 
   readLinks, 
   getAllUsers,
-} = require('../services/database/mongoFactory')
+} = require('../models/database/mongoFactory')
 const { User, Search } = require('../mocks/mongoose.mock')
 
 describe('Testing {mongoFactory}', () => {

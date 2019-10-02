@@ -1,11 +1,11 @@
-const RedisFactory = require('../services/redis/redisFactory')
+const RedisFactory = require('../models/redis/redisFactory')
 const Redis = require('../mocks/redis.mock')
 const { User, Search } = require('../mocks/mongoose.mock')
 const { print } = require('../utils/utils')
 const { 
   getNewLinks,
-} = require('../services/crawler')
-const { getAllUsers } = require('../services/database/mongoFactory')
+} = require('../models/crawler')
+const { getAllUsers } = require('../models/database/mongoFactory')
 
 describe('{redisFactory}', () => {
   const redis = new Redis()

@@ -1,4 +1,4 @@
-const { errorCheckHandler } = require('../services/alerts')
+const { errorCheckHandler } = require('../models/alerts')
 
 describe('Checking {alerts}', () => {
   test('{errorCheckHandler} should return array with 2 errors', () => {
