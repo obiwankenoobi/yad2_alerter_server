@@ -96,18 +96,21 @@ function initNightmare() {
 
       await addNewSearch(Search)(url, hash)
   
-      isResults = await this.instance
+      return this.instance
       .goto(url)
       .exists('.no_results')
       .then(res => {
         if (res) {
-          this.instance.end()
-          return false
+          console.log('no results')
+          return this.instance
+          .end()
+          .then(() => false)
         } else {
-          this.instance
+          console.log('trying expend: ', url)
+          return this.instance
             .goto(url)
             .wait('.feed_list')
-            .evaluate(async () => {
+            .evaluate(async config => {
           
               const clickableItemQuery = '.feeditem .feed_item div'
               const adFinderQuery = '.feeditem .platinum'
@@ -124,30 +127,30 @@ function initNightmare() {
                   console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
                   continue;
                 } 
+
+                if (children[i].querySelector(agencyFinderQuery)) {
+                  if (config.ignoreAgencies) {
+                    console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+                    console.log('@@@@@@@@@@@ agency alert @@@@@@@@@@@')
+                    console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+                    continue;
+                  }
+                } 
                 
-                // if (config.ignoreAgencies) {
-                //   if (children[i].querySelector(agencyFinderQuery)) {
-                //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
-                //     console.log('@@@@@@@@@@@ agency alert @@@@@@@@@@@')
-                //     console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
-                //     continue;
-                //   }
-                // } 
-                
-                else {
+                //else {
                   const el = children[i].querySelector(clickableItemQuery)
-                  if (el) await el.click()
-                }
+                  if (el) await el.click()  
+                //}
               }
-            })
-          return true
+              return true
+            }, config)
         }
       })
-      return isResults
     } catch(e) {
       console.log({ error: e, url })
-      this.instance.end()
-      return false
+      return this.instance
+      .end()
+      .then(() => false)
     }
   }
 
@@ -158,7 +161,7 @@ function initNightmare() {
 
     try {
       const isOpened = '.feeditem .accordion_opened'
-      const links = await this.instance
+      return this.instance
       .wait(isOpened)
       .evaluate(async() => {
         async function wait(ms) {
@@ -178,13 +181,14 @@ function initNightmare() {
         }
         
         return arr
-
-      }).end()
-  
-      return links
+      })
+      .end()
+      .then(links => links)
     } catch(e) {
       console.log(e)
-      this.instance.end()
+      this.instance
+      .end(() => 'process end 4')
+      .then(console.log)
     }
   }
   /**

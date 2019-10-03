@@ -57,12 +57,12 @@ async function main() {
     try {
       // expending feed to get access to links
       const isResults = await expendFeed(config);    
-
+      console.log('isResults: ', isResults)
       if (!isResults) continue
-      
+
       // get links from yad2
       const newLinks = await getLinks()
-      
+      console.log('newLinks: ', newLinks)
       const oldHashedResults = await getSearchResultsHashFromRedis(hash)
       
       const newHashedResults = hashFunc(newLinks)

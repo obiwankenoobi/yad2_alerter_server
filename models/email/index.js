@@ -27,8 +27,8 @@ async function sendEmail(emailObj) {
   // create reusable transporter object using the default SMTP transport
   const transporter = nodemailer.createTransport({
       host: 'smtp.office365.com',
-      port: 587,
-      secure: false, // true for 465, false for other ports
+      port: process.env.NODE_ENV === 'production' ? 465 : 587,
+      secure: process.env.NODE_ENV === 'production' ? true : false, // true for 465, false for other ports
       auth: {
           user: process.env.SMTP_EMAIL ,  // generated ethereal user
           pass: process.env.SMTP_PASSWORD // generated ethereal password
@@ -87,6 +87,7 @@ function sendLinks(results) {
         text: linksFound.map(id => 'https://www.yad2.co.il/item/'.concat(id) + '\n').toString().replace(/,/g, ''),
         html:''
       }
+
       sendEmail(emailObj)
       .then(res => console.log({ senTto:email, res }))
       .catch(console.error)

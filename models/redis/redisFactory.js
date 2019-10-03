@@ -1,5 +1,6 @@
 const { print } = require('../../utils/utils')
 const { getAllUsers } = require('../database/mongoFactory')
+const { User } = require('../../db/models/UserSchema')
 
 /**
 * Object to save in redis with information about the current search
@@ -137,7 +138,7 @@ class RedisFactory {
   async updateAlertInRedis({ hash, hashes, email, url }) {
     let readyHashes = typeof hashes !== 'object' ? JSON.parse(hashes) : hashes
     if (!readyHashes) {
-      const users = await getAllUsers()
+      const users = await getAllUsers(User)
       const hashes = await getHashes(users)
       readyHashes = hashes
     }
