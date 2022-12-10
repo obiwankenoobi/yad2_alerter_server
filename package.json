@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "bluebird": "^3.5.5",
-    "body-parser": "~1.18.2",
+    "body-parser": "~1.20.1",
     "cookie-parser": "~1.4.3",
     "cors": "^2.8.4",
     "ddos": "^0.1.31",
@@ -20,7 +20,7 @@
     "dotenv": "^8.0.0",
     "esdoc": "^1.1.0",
     "esdoc-standard-plugin": "^1.0.0",
-    "express": "~4.15.5",
+    "express": "~4.18.2",
     "express-rate-limit": "^5.0.0",
     "express-session": "^1.15.6",
     "express-validator": "^5.3.1",
